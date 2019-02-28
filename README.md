@@ -101,6 +101,7 @@ SARGE output can be indexed (bin/index) and retrieved using region syntax simila
 
 Currently, SARGE is designed to expect only one chromosome per set of input files, but this may change in the future.
 
+All programs should display a usage message if run with no arguments.
 
 
  
