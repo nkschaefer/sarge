@@ -1,4 +1,6 @@
-# sparge
+# sarge
+
+Fast, heuristic parsimony-based ancestral recombination graph inference
 
 ## Requirements:
 
