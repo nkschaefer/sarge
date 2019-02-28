@@ -91,6 +91,8 @@ Some programs within SARGE can use a \*.alleles file as well. This file correspo
 
 There is a program (bin/vcf2sarge) that can help with this conversion. It requires that you have [HTSLib](http://www.htslib.org/download/) installed, compile SARGE with the HTSLIB=1 option, and pipe output from [BCFTools](http://www.htslib.org/download/) to create input data.
 
+One parameter that bin/vcf2sarge can take is a list of (minimum and maximum) coverage depth cutoffs per sample. This is extremely important to set when working with ancient data; a histogram of coverage depths can be produced from BCF/VCF using bin/vcf_depths. These can then be inspected to determine the correct coverage cutoffs before running bin/vcf2sarge.
+
 ## Running SARGE
 
 The main program in SARGE is bin/sarge. It requires a \*.geno.gz file, \*.sites file, and a propagation distance. The propagation distance parameter describes how many bases (upstream and downstream) a given site is allowed to communicate its existence. Increasing this number will cause slower execution and more memory usage but will make somewhat better trees. Typically, there is a point of diminishing returns beyond which it is not useful to increase this parameter (it will only slow things down). SARGE creates an output file (gzipped binary format), along with a "recombination" file, which is a tab separated file of chromosome, start position, end position, upstream clade, downstream clade, and moving clade. 
