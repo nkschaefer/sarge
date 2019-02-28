@@ -2,6 +2,9 @@
 
 Fast, heuristic parsimony-based ancestral recombination graph inference
 
+## Warning
+This repository is under heavy development. Stuff like output file format might change slightly, and files will probably change, along with organization of some of the code. The code that is on here right now might be somewhat less than beautiful.
+
 ## Requirements:
 
 ### Essential stuff
