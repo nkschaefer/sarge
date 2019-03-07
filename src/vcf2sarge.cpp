@@ -400,329 +400,327 @@ environment variables. Then recompile SARGE with HTSLIB=1.\n");
         // Convert depths to look up by index
         vector<pair<int, int> > depths_index;
         
-        if (bcf){
-            // Read BCF from stdin.
-            bcf_hdr_t* bcf_header;
-            bcf1_t* bcf_record = bcf_init();
-            htsFile* bcf_reader = bcf_open("-", "r");
-            if (bcf_reader == NULL){
-                fprintf(stderr, "ERROR interpreting stdin as BCF format.\n");
+        // Read BCF from stdin.
+        bcf_hdr_t* bcf_header;
+        bcf1_t* bcf_record = bcf_init();
+        htsFile* bcf_reader = bcf_open("-", "r");
+        if (bcf_reader == NULL){
+            fprintf(stderr, "ERROR interpreting stdin as BCF format.\n");
+            exit(1);
+        }
+        bcf_header = bcf_hdr_read(bcf_reader);
+        int num_samples = bcf_hdr_nsamples(bcf_header);
+        num_haps = num_samples * 2;
+        for (int i = 0; i < num_samples; ++i){
+            fprintf(out_haps_f, "%s-1\n", bcf_header->samples[i]);
+            fprintf(out_haps_f, "%s-2\n", bcf_header->samples[i]);
+            if (depthfile_given){
+                depths_index.push_back(depths[bcf_header->samples[i]]);
+            }
+        }
+        fclose(out_haps_f);
+        fprintf(stderr, "Read %d haplotypes\n", num_haps);
+        
+        // Prepare buffer to store genotypes at all sites
+        char geno_str[num_haps+2];
+        geno_str[num_haps+1] = '\0';
+        geno_str[num_haps] = '\n';
+        
+        // Array to store genotype data
+        int32_t* gts = NULL;
+        int n_gts = 0;
+        
+        const char* gq_key = "GQ";
+        
+        while(bcf_read(bcf_reader, bcf_header, bcf_record) == 0){
+            // Make sure we're on the right chromosome.
+            string chrom = bcf_hdr_id2name(bcf_header, bcf_record->rid);
+            if (chrom != chromosome){
+                fprintf(stderr, "ERROR: unknown chromosome %s encountered.\n",
+                    bcf_hdr_id2name(bcf_header, bcf_record->rid));
                 exit(1);
             }
-            bcf_header = bcf_hdr_read(bcf_reader);
-            int num_samples = bcf_hdr_nsamples(bcf_header);
-            num_haps = num_samples * 2;
-            for (int i = 0; i < num_samples; ++i){
-                fprintf(out_haps_f, "%s-1\n", bcf_header->samples[i]);
-                fprintf(out_haps_f, "%s-2\n", bcf_header->samples[i]);
-                if (depthfile_given){
-                    depths_index.push_back(depths[bcf_header->samples[i]]);
+            
+            // REALLY IMPORTANT NOTE: pos here is 0-based, whereas in VCF it's 1-based.
+            if (start != -1 && bcf_record->pos + 1 < start){
+                fprintf(stderr, "skipping %d\r", bcf_record->pos + 1);
+                continue;
+            }
+            if (end != -1 && bcf_record->pos + 1 > end){
+                break;
+            }
+            
+            // Display processing message
+            if (bcf_record->pos + 1 - last_printed >= progress){
+                fprintf(stderr, "Processed %s\t%d\r", chrom.c_str(), bcf_record->pos);
+                last_printed = bcf_record->pos;
+            }
+            
+            // Check all sites between the previous and current one where
+            // ancestral does not match reference.
+            if (bcf_record->pos + 1 > prevpos + 1){
+                for (int ind = prevpos + 1; ind < bcf_record->pos + 1; ++ind){
+                    char anc_base = upper(anc_seq->seq.s[ind-1]);
+                    char ref_base = upper(ref_seq->seq.s[ind-1]);
+                    if (isbase(anc_base) && isbase(ref_base) && anc_base != ref_base){
+                        // All haplotypes in this file were homozygous reference
+                        // at this site, since it's missing from the file (and it
+                        // wasn't filtered out, since neither ref_base or anc_base
+                        // is masked to N). Therefore, all haplotypes share a
+                        // derived allele at this site.
+                        for (int i = 0; i < num_haps; ++i){
+                            geno_str[i] = '1';
+                        }
+                        gzwrite(out_geno_f, geno_str, num_haps+1);
+                        fprintf(out_sites_f, "%s\t%d\n", chrom.c_str(), ind);
+                        fprintf(out_alleles_f, "%c\t%c\n", anc_base, ref_base);
+                    }
                 }
             }
-            fclose(out_haps_f);
-            fprintf(stderr, "Read %d haplotypes\n", num_haps);
             
-            // Prepare buffer to store genotypes at all sites
-            char geno_str[num_haps+2];
-            geno_str[num_haps+1] = '\0';
-            geno_str[num_haps] = '\n';
+            prevpos = bcf_record->pos + 1;
             
-            // Array to store genotype data
-            int32_t* gts = NULL;
-            int n_gts = 0;
+            if (bcf_record->n_allele > 2){
+                // Multiallelic site; nothing to do.
+                continue;
+            }
             
-            const char* gq_key = "GQ";
+            /*
+            // Filter on variant quality?
+            if (bcf_record->qual < quality){
+                continue;
+            }
+            */
             
-            while(bcf_read(bcf_reader, bcf_header, bcf_record) == 0){
-                // Make sure we're on the right chromosome.
-                string chrom = bcf_hdr_id2name(bcf_header, bcf_record->rid);
-                if (chrom != chromosome){
-                    fprintf(stderr, "ERROR: unknown chromosome %s encountered.\n",
-                        bcf_hdr_id2name(bcf_header, bcf_record->rid));
-                    exit(1);
-                }
-                
-                // REALLY IMPORTANT NOTE: pos here is 0-based, whereas in VCF it's 1-based.
-                if (start != -1 && bcf_record->pos + 1 < start){
-                    fprintf(stderr, "skipping %d\r", bcf_record->pos + 1);
-                    continue;
-                }
-                if (end != -1 && bcf_record->pos + 1 > end){
+            // Load ref/alt alleles and other stuff
+            // This puts alleles in bcf_record->d.allele[index]
+            // Options for parameter 2:
+            /*
+            BCF_UN_STR  1       // up to ALT inclusive
+            BCF_UN_FLT  2       // up to FILTER
+            BCF_UN_INFO 4       // up to INFO
+            BCF_UN_SHR  (BCF_UN_STR|BCF_UN_FLT|BCF_UN_INFO) // all shared information
+            BCF_UN_FMT  8                           // unpack format and each sample
+            BCF_UN_IND  BCF_UN_FMT                  // a synonymo of BCF_UN_FMT
+            BCF_UN_ALL (BCF_UN_SHR|BCF_UN_FMT) // everything
+            */
+            
+            bcf_unpack(bcf_record, BCF_UN_STR);
+            
+            bool indel = false;
+            for (int i = 0; i < bcf_record->n_allele; ++i){
+                if (strlen(bcf_record->d.allele[i]) > 1){
+                    indel = true;
                     break;
                 }
-                
-                // Display processing message
-                if (bcf_record->pos + 1 - last_printed >= progress){
-                    fprintf(stderr, "Processed %s\t%d\r", chrom.c_str(), bcf_record->pos);
-                    last_printed = bcf_record->pos;
+            }
+            if (indel){
+                continue;
+            }
+            else if (!isbase(bcf_record->d.allele[0][0])){
+                // Reference genome has N
+                continue;
+            }
+            
+            bool flip_haps = false;
+            char anc_base = upper(anc_seq->seq.s[bcf_record->pos]);
+            
+            
+            if (!isbase(anc_base)){
+                // Unknown ancestral allele - can't do anything.
+                continue;
+            }
+            else if (bcf_record->n_allele > 1 && anc_base != bcf_record->d.allele[0][0] && 
+                anc_base != bcf_record->d.allele[1][0]){
+                // Ancestral doesn't match either allele at this site
+                continue;
+            }
+            
+            bool all_ref = false;
+            bool all_ancestral = true;
+            
+            if (bcf_record->n_allele == 1){
+                // All genotypes are homozygous reference. Only print out something
+                // at this site if reference is derived (non-ancestral)
+                if (bcf_record->d.allele[0][0] != anc_base){
+                    all_ref = true;
+                    all_ancestral = false;
                 }
-                
-                // Check all sites between the previous and current one where
-                // ancestral does not match reference.
-                if (bcf_record->pos + 1 > prevpos + 1){
-                    for (int ind = prevpos + 1; ind < bcf_record->pos + 1; ++ind){
-                        char anc_base = upper(anc_seq->seq.s[ind-1]);
-                        char ref_base = upper(ref_seq->seq.s[ind-1]);
-                        if (isbase(anc_base) && isbase(ref_base) && anc_base != ref_base){
-                            // All haplotypes in this file were homozygous reference
-                            // at this site, since it's missing from the file (and it
-                            // wasn't filtered out, since neither ref_base or anc_base
-                            // is masked to N). Therefore, all haplotypes share a
-                            // derived allele at this site.
-                            for (int i = 0; i < num_haps; ++i){
-                                geno_str[i] = '1';
-                            }
-                            gzwrite(out_geno_f, geno_str, num_haps+1);
-                            fprintf(out_sites_f, "%s\t%d\n", chrom.c_str(), ind);
-                            fprintf(out_alleles_f, "%c\t%c\n", anc_base, ref_base);
-                        }
-                    }
-                }
-                
-                prevpos = bcf_record->pos + 1;
-                
-                if (bcf_record->n_allele > 2){
-                    // Multiallelic site; nothing to do.
+                else{
+                    // Ancestral base matches reference and all are homozygous
+                    // reference.
                     continue;
                 }
-                
-                /*
-                // Filter on variant quality?
-                if (bcf_record->qual < quality){
-                    continue;
+            }
+            
+            if (!all_ref){
+                if (anc_base == bcf_record->d.allele[0][0]){
+                    flip_haps = false;
                 }
-                */
-                
-                // Load ref/alt alleles and other stuff
-                // This puts alleles in bcf_record->d.allele[index]
-                // Options for parameter 2:
-                /*
-                BCF_UN_STR  1       // up to ALT inclusive
-                BCF_UN_FLT  2       // up to FILTER
-                BCF_UN_INFO 4       // up to INFO
-                BCF_UN_SHR  (BCF_UN_STR|BCF_UN_FLT|BCF_UN_INFO) // all shared information
-                BCF_UN_FMT  8                           // unpack format and each sample
-                BCF_UN_IND  BCF_UN_FMT                  // a synonymo of BCF_UN_FMT
-                BCF_UN_ALL (BCF_UN_SHR|BCF_UN_FMT) // everything
-                */
-                
-                bcf_unpack(bcf_record, BCF_UN_STR);
-                
-                bool indel = false;
-                for (int i = 0; i < bcf_record->n_allele; ++i){
-                    if (strlen(bcf_record->d.allele[i]) > 1){
-                        indel = true;
-                        break;
-                    }
+                else if (anc_base == bcf_record->d.allele[1][0]){
+                    flip_haps = true;
                 }
-                if (indel){
-                    continue;
-                }
-                else if (!isbase(bcf_record->d.allele[0][0])){
-                    // Reference genome has N
-                    continue;
-                }
-                
-                bool flip_haps = false;
-                char anc_base = upper(anc_seq->seq.s[bcf_record->pos]);
-                
-                
-                if (!isbase(anc_base)){
-                    // Unknown ancestral allele - can't do anything.
-                    continue;
-                }
-                else if (bcf_record->n_allele > 1 && anc_base != bcf_record->d.allele[0][0] && 
-                    anc_base != bcf_record->d.allele[1][0]){
-                    // Ancestral doesn't match either allele at this site
-                    continue;
-                }
-                
-                bool all_ref = false;
-                bool all_ancestral = true;
-                
-                if (bcf_record->n_allele == 1){
-                    // All genotypes are homozygous reference. Only print out something
-                    // at this site if reference is derived (non-ancestral)
-                    if (bcf_record->d.allele[0][0] != anc_base){
-                        all_ref = true;
-                        all_ancestral = false;
-                    }
-                    else{
-                        // Ancestral base matches reference and all are homozygous
-                        // reference.
-                        continue;
-                    }
-                }
-                
-                if (!all_ref){
-                    if (anc_base == bcf_record->d.allele[0][0]){
-                        flip_haps = false;
-                    }
-                    else if (anc_base == bcf_record->d.allele[1][0]){
-                        flip_haps = true;
-                    }
-                }
-                
-                
-                // Determine if all genotypes are valid at this site.
-                bool geno_pass = true;
-                
-                // Look through all genotypes.
-                
-                int num_loaded = bcf_get_genotypes(bcf_header, bcf_record, &gts, &n_gts);
-                if (num_loaded <= 0){
-                    fprintf(stderr, "ERROR loading genotypes at %s %d\n", 
-                        chrom.c_str(), bcf_record->pos);
-                    exit(1);
-                }
-                
-                // Filter out any sites where there is a genotype quality below
-                // threshold (OPTIONAL)
-                if (quality > 0){
-                    float* gqs = NULL;
-                    int n_gqs = 0;
-                    int num_gq_loaded = bcf_get_format_float(bcf_header, bcf_record, "GQ",
-                        &gqs, &n_gqs);
-                    if (num_gq_loaded > 0){
-                        for (int i = 0; i < num_samples; ++i){
-                            if (!isnan(gqs[i]) && gqs[i] != bcf_float_missing &&
-                                gqs[i] < quality){
-                                geno_pass = false;
-                                break;
-                            }
-                        }
-                    }
-                    free(gqs);
-                }
-                // Filter out any sites where there is a depth out of threshold
-                // (OPTIONAL)
-                if ((depth > 0 || depthfile_given) && geno_pass){
-                    int32_t* dps = NULL;
-                    int n_dps = 0;
-                    int num_dp_loaded = bcf_get_format_int32(bcf_header, bcf_record, "DP",
-                        &dps, &n_dps);
-                    if (num_dp_loaded > 0){
-                        for (int i = 0; i < num_samples; ++i){
-                            if (dps[i] != bcf_int32_missing){
-                                if (depthfile_given){
-                                    if (dps[i] < depths_index[i].first || dps[i] > depths_index[i].second){
-                                        geno_pass = false;
-                                        break;
-                                    }
-                                }
-                                else if (dps[i] < depth){
-                                    geno_pass = false;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    free(dps);
-                }
-                
-                if (geno_pass){
-                    int ploidy = n_gts / num_samples;
-                    
+            }
+            
+            
+            // Determine if all genotypes are valid at this site.
+            bool geno_pass = true;
+            
+            // Look through all genotypes.
+            
+            int num_loaded = bcf_get_genotypes(bcf_header, bcf_record, &gts, &n_gts);
+            if (num_loaded <= 0){
+                fprintf(stderr, "ERROR loading genotypes at %s %d\n", 
+                    chrom.c_str(), bcf_record->pos);
+                exit(1);
+            }
+            
+            // Filter out any sites where there is a genotype quality below
+            // threshold (OPTIONAL)
+            if (quality > 0){
+                float* gqs = NULL;
+                int n_gqs = 0;
+                int num_gq_loaded = bcf_get_format_float(bcf_header, bcf_record, "GQ",
+                    &gqs, &n_gqs);
+                if (num_gq_loaded > 0){
                     for (int i = 0; i < num_samples; ++i){
-                        int32_t* gtptr = gts + i*ploidy;
-                        for (int j = 0; j < ploidy; ++j){
-                            if (gtptr[j] == bcf_int32_vector_end){
-                                // Lower ploidy?
-                                geno_pass = false;
-                                break;
-                            }
-                            else if (bcf_gt_is_missing(gtptr[j])){
-                                // Missing genotype.
-                                geno_pass = false;
-                                break;
-                            }
-                            else if (!ignore_phasing && !bcf_gt_is_phased(gtptr[j])){
-                                // Unphased genotype?
-                                // Check whether it's homozygous (which is phased by definition).
-                                bool homozygous = true;
-                                for (int k = 0; k < ploidy; ++k){
-                                    if (k != j && bcf_gt_allele(gtptr[j]) != bcf_gt_allele(gtptr[k])){
-                                        homozygous = false;
-                                        break;
-                                    }
-                                }
-                                if (!homozygous){
-                                    geno_pass = false;
-                                    break;
-                                }
-                            }
-                        
-                            if (!all_ref){
-                                // Don't bother looking at allele indices if all match
-                                // the reference allele; we're just checking if the site
-                                // should be skipped.
-                                
-                                // Retrieve allele index
-                                int allele_index = bcf_gt_allele(gtptr[j]);
-                                if (flip_haps){
-                                    if (allele_index == 0){
-                                        geno_str[ploidy*i + j] = '1';
-                                        all_ancestral = false;
-                                    }
-                                    else{
-                                        geno_str[ploidy*i + j] = '0';
-                                    }
-                                }
-                                else{
-                                    if (allele_index == 0){
-                                        geno_str[ploidy*i + j] = '0';
-                                    }
-                                    else{
-                                        geno_str[ploidy*i + j] = '1';
-                                        all_ancestral = false;
-                                    }
-                                }
-                            }
-                        }
-                        if (!geno_pass){
+                        if (!isnan(gqs[i]) && gqs[i] != bcf_float_missing &&
+                            gqs[i] < quality){
+                            geno_pass = false;
                             break;
                         }
                     }
                 }
+                free(gqs);
+            }
+            // Filter out any sites where there is a depth out of threshold
+            // (OPTIONAL)
+            if ((depth > 0 || depthfile_given) && geno_pass){
+                int32_t* dps = NULL;
+                int n_dps = 0;
+                int num_dp_loaded = bcf_get_format_int32(bcf_header, bcf_record, "DP",
+                    &dps, &n_dps);
+                if (num_dp_loaded > 0){
+                    for (int i = 0; i < num_samples; ++i){
+                        if (dps[i] != bcf_int32_missing){
+                            if (depthfile_given){
+                                if (dps[i] < depths_index[i].first || dps[i] > depths_index[i].second){
+                                    geno_pass = false;
+                                    break;
+                                }
+                            }
+                            else if (dps[i] < depth){
+                                geno_pass = false;
+                                break;
+                            }
+                        }
+                    }
+                }
+                free(dps);
+            }
+            
+            if (geno_pass){
+                int ploidy = n_gts / num_samples;
                 
-                if (!geno_pass){
-                    continue;
-                } 
-                else{
-                    if (all_ref){
-                        for (int i = 0; i < num_haps; ++i){
-                            geno_str[i] = '1';
+                for (int i = 0; i < num_samples; ++i){
+                    int32_t* gtptr = gts + i*ploidy;
+                    for (int j = 0; j < ploidy; ++j){
+                        if (gtptr[j] == bcf_int32_vector_end){
+                            // Lower ploidy?
+                            geno_pass = false;
+                            break;
                         }
-                    }
-                    else if (all_ancestral){
-                        // Don't bother.
-                        continue;
-                    }
+                        else if (bcf_gt_is_missing(gtptr[j])){
+                            // Missing genotype.
+                            geno_pass = false;
+                            break;
+                        }
+                        else if (!ignore_phasing && !bcf_gt_is_phased(gtptr[j])){
+                            // Unphased genotype?
+                            // Check whether it's homozygous (which is phased by definition).
+                            bool homozygous = true;
+                            for (int k = 0; k < ploidy; ++k){
+                                if (k != j && bcf_gt_allele(gtptr[j]) != bcf_gt_allele(gtptr[k])){
+                                    homozygous = false;
+                                    break;
+                                }
+                            }
+                            if (!homozygous){
+                                geno_pass = false;
+                                break;
+                            }
+                        }
                     
-                    // Write site to disk
-                    gzwrite(out_geno_f, geno_str, num_haps+1);
-                    fprintf(out_sites_f, "%s\t%d\n", chrom.c_str(), bcf_record->pos + 1);
-                    
-                    // Write alleles
-                    if (all_ref){
-                        fprintf(out_alleles_f, "%c\t%c\n", anc_base, bcf_record->d.allele[0][0]);
+                        if (!all_ref){
+                            // Don't bother looking at allele indices if all match
+                            // the reference allele; we're just checking if the site
+                            // should be skipped.
+                            
+                            // Retrieve allele index
+                            int allele_index = bcf_gt_allele(gtptr[j]);
+                            if (flip_haps){
+                                if (allele_index == 0){
+                                    geno_str[ploidy*i + j] = '1';
+                                    all_ancestral = false;
+                                }
+                                else{
+                                    geno_str[ploidy*i + j] = '0';
+                                }
+                            }
+                            else{
+                                if (allele_index == 0){
+                                    geno_str[ploidy*i + j] = '0';
+                                }
+                                else{
+                                    geno_str[ploidy*i + j] = '1';
+                                    all_ancestral = false;
+                                }
+                            }
+                        }
                     }
-                    else{
-                        if (flip_haps){
-                            fprintf(out_alleles_f, "%c\t%c\n", anc_base, bcf_record->d.allele[0][0]);
-                        }
-                        else{
-                            fprintf(out_alleles_f, "%c\t%c\n", anc_base, bcf_record->d.allele[1][0]);
-                        }
+                    if (!geno_pass){
+                        break;
                     }
                 }
             }
             
-            bcf_hdr_destroy(bcf_header);
-            bcf_destroy(bcf_record);
-            bcf_close(bcf_reader);
-            free(gts);
+            if (!geno_pass){
+                continue;
+            } 
+            else{
+                if (all_ref){
+                    for (int i = 0; i < num_haps; ++i){
+                        geno_str[i] = '1';
+                    }
+                }
+                else if (all_ancestral){
+                    // Don't bother.
+                    continue;
+                }
+                
+                // Write site to disk
+                gzwrite(out_geno_f, geno_str, num_haps+1);
+                fprintf(out_sites_f, "%s\t%d\n", chrom.c_str(), bcf_record->pos + 1);
+                
+                // Write alleles
+                if (all_ref){
+                    fprintf(out_alleles_f, "%c\t%c\n", anc_base, bcf_record->d.allele[0][0]);
+                }
+                else{
+                    if (flip_haps){
+                        fprintf(out_alleles_f, "%c\t%c\n", anc_base, bcf_record->d.allele[0][0]);
+                    }
+                    else{
+                        fprintf(out_alleles_f, "%c\t%c\n", anc_base, bcf_record->d.allele[1][0]);
+                    }
+                }
+            }
         }
+        
+        bcf_hdr_destroy(bcf_header);
+        bcf_destroy(bcf_record);
+        bcf_close(bcf_reader);
+        free(gts);
         
         // Break carriage return line
         fprintf(stderr, "\n");
