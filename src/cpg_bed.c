@@ -23,7 +23,7 @@
     /**
      * Function to parse FASTA, including gzipped files.
      */
-    inline kseq_t* parse_fasta(char *filename){
+    static inline kseq_t* parse_fasta(char *filename){
         gzFile fp = gzopen(filename, "r");
         if (!fp){
             fprintf(stderr, "ERROR: unable to open file %s\n", filename);
@@ -38,7 +38,7 @@
     /**
      * Function to parse FASTA from stdin.
      */
-    inline kseq_t* parse_fasta_stdin(){
+    static inline kseq_t* parse_fasta_stdin(){
         // Useful blog post:
         // http://biowize.wordpress.com/2013/03/05/using-kseq-h-with-stdin/
         FILE *instream = stdin;
