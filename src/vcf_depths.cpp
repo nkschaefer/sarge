@@ -15,7 +15,6 @@
 #include <cstdlib>
 #include <utility>
 #include <math.h>
-#include "kseq.h"
 #ifdef HTSLIB
     #include <htslib/vcf.h>
 #endif
