@@ -146,6 +146,7 @@ bool resolve_recomb(arg_node* node,
     FILE*,
     long int,
     long int,
-    std::set<arg_node*>&);
+    std::set<arg_node*>&,
+    std::string&);
     
 #endif

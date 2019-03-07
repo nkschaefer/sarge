@@ -1014,10 +1014,13 @@ void compare_all_sites(
     
     long int bitsets_popped = 0;
     
+    string prevchrom;
+    
     while(!matrix_end_reached){
     
         // Grab the chromosome position of the right index.
         long int right_site = locs[rightIndex].pos;
+        string curchrom = locs[rightIndex].chrom;
         
         // Track propagation limits.
         long int right_start = max(right_site - prop_dist, (long int) 1);
@@ -1184,7 +1187,8 @@ void compare_all_sites(
                 recomb_solvable = resolve_recomb(n, lv_grps, 
                     sites_pos, sites_clade, prop_dist, root, 
                     true, try_other, recomb_catalog, 
-                    newnodes, num_haplotypes, recomb_out, -1, -1, to_solve);
+                    newnodes, num_haplotypes, recomb_out, -1, -1, to_solve,
+                    curchrom);
 
                 while (!recomb_solvable && try_other != NULL && 
                     *try_other->sites.rbegin() < right_site - 2*prop_dist && 
@@ -1193,7 +1197,8 @@ void compare_all_sites(
                     recomb_solvable = resolve_recomb(try_other, lv_grps,
                         sites_pos, sites_clade, prop_dist, root,
                         true, try_other, recomb_catalog, 
-                        newnodes, num_haplotypes, recomb_out, -1, -1, to_solve);
+                        newnodes, num_haplotypes, recomb_out, -1, -1, to_solve,
+                        curchrom);
                     
                     
                 }
@@ -1486,6 +1491,8 @@ void compare_all_sites(
             fprintf(stderr, "Processed %s %ld\r", locs[rightIndex-1].chrom.c_str(), locs[rightIndex-1].pos);
         }
         
+        prevchrom = curchrom;
+        
     }
     
     // === Clean up === //
@@ -1518,13 +1525,15 @@ void compare_all_sites(
                 recomb_solvable = resolve_recomb(n, lv_grps, 
                     sites_pos, sites_clade, prop_dist, root, 
                     true, try_other, recomb_catalog, 
-                    newnodes, num_haplotypes, recomb_out, -1, -1, solvenodes);
+                    newnodes, num_haplotypes, recomb_out, -1, -1, solvenodes,
+                    prevchrom);
                 while (!recomb_solvable && try_other != NULL){
 
                     recomb_solvable = resolve_recomb(try_other, lv_grps,
                         sites_pos, sites_clade, prop_dist, root,
                         true, try_other, recomb_catalog, 
-                        newnodes, num_haplotypes, recomb_out, -1, -1, solvenodes);
+                        newnodes, num_haplotypes, recomb_out, -1, -1, solvenodes,
+                        prevchrom);
                 }
                 if (n->edges_from.size() == 0){
                     recomb_solvable = false;

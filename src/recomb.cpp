@@ -2775,7 +2775,8 @@ bool resolve_recomb(arg_node* node,
     FILE* rcfile,
     long int hard_limit_l,
     long int hard_limit_r,
-    set<arg_node*>& nodes_external){
+    set<arg_node*>& nodes_external,
+    string& curchrom){
 
     candidate_other = NULL;
     
@@ -3906,7 +3907,7 @@ bool resolve_recomb(arg_node* node,
                 }
             }
             
-            if (newleft != -1 && newright != -1){
+            if (newleft != -1 && newright != -1 && newleft < newright){
                 r.left = newleft;
                 r.right = newright;
             }
@@ -3986,8 +3987,14 @@ bool resolve_recomb(arg_node* node,
         long int l_boundary = r.left + (long int)floor((float)(r.right-r.left)/2);
         long int r_boundary = r.right - (long int)ceil((float)(r.right-r.left)/2);
         
+        if (r.left >= r.right){
+            fprintf(stderr, "recomb left index is greater than right index\n");
+            fprintf(stderr, "%ld %ld\n", r.left, r.right);
+            exit(1);
+        }
+        
         // print to recombination file in human-readable format.
-        fprintf(rcfile, "seq\t%ld\t%ld\t", r.left, r.right);
+        fprintf(rcfile, "%s\t%ld\t%ld\t", curchrom.c_str(), r.left, r.right);
         set<unsigned int> s1 = bitset2set(r.alpha, num_haplotypes);
         for (set<unsigned int>::iterator n = s1.begin(); n != s1.end(); ++n){
             fprintf(rcfile, "%d,", *n);
