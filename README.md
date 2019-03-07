@@ -1,4 +1,9 @@
-# sparge
+# sarge
+
+Fast, heuristic parsimony-based ancestral recombination graph inference
+
+## Warning
+This repository is under heavy development. Output file format might change slightly in the future, and the organization of the code is subject to change as well. The code that is on here right now might be somewhat less than beautiful.
 
 ## Requirements:
 
@@ -15,8 +20,9 @@
 * For efficiently creating input files:
   * [HTSLib](http://www.htslib.org/download/)
   * [BCFTools](http://www.htslib.org/download/)
-* For splitting input files for parallelization, [Python 2.7](https://www.python.org/download/releases/2.7/) installed and in your ``$PATH``
-* For running jobs automatically in parallel, [GNU Parallel](https://www.gnu.org/software/parallel/) installed and in your ``$PATH``
+* For splitting input files for parallelization (utilities/split_input_gaps.py), [Python 2.7](https://www.python.org/download/releases/2.7/) installed and in your ``$PATH``
+* For running jobs automatically in parallel (utilities/sarge_parallel.sh), [GNU Parallel](https://www.gnu.org/software/parallel/) installed and in your ``$PATH``
+* For visualizing trees (utilities/view_trees.py), the Phylo package from [BioPython](https://biopython.org/) must be available
 
 ## Compilation instructions
 After downloading, programs can be compiled by running `make` in the root directory. This will create executable programs in the `bin` directory.
@@ -72,6 +78,33 @@ All of these above options can be combined during compilation. In other words, i
 ``make MAXHAPS=500 HTSLIB=1``
 
 If you make a mistake, just ``make clean`` and start over.
+
+## Preparing data
+
+SARGE expects 3 main input files, in a very similar format to other ARG programs. The main one, a \*.geno.gz file, is a gzip-compressed text file where each line represents a variable site and each position in the line is 1 or 0, representing if an individual (phased) haplotype has an ancestral (0) or derived (1) allele. All lines must be the same length, and there can be no missing data. The outgroup you use should not be included as one of the sequences -- instead, distance from the outgroup is measured in the number of fixed derived mutations in your input data (i.e. if you are studying humans with the chimpanzee as outgroup, then every human/chimpanzee difference should be represented as a row of all "1" entries in this file).
+
+Next, you should include a \*.sites file. Lines in this file correspond to variable sites in the \*.geno.gz file. Each entry in the sites file is a tab-separated chromosome and position of the variable site.
+
+Finally, you should have a \*.haps file. Each line of this file should correspond to a character (column) in the \*.geno.gz file. This file lists which phased haplotype each column in the \*.geno.gz refers to. In other words, if you have 10 diploid individuals (20 phased haplotypes), each line in \*.geno.gz should have 20 characters, and the \*.haps file should have 20 lines, like "individual1-1," "individual1-2," "individual2-1," "individual2-2," and so on.
+
+Some programs within SARGE can use a \*.alleles file as well. This file corresponds to the \*.sites file; each line in the \*.alleles file represents a variable site. There should be two tab-separated characters per line, the ancestral allele (the one matching "0" in the input file) and the derived allele (matching "1" in the input file).
+
+There is a program (bin/vcf2sarge) that can help with this conversion. It requires that you have [HTSLib](http://www.htslib.org/download/) installed, compile SARGE with the HTSLIB=1 option, and pipe output from [BCFTools](http://www.htslib.org/download/) to create input data.
+
+One parameter that bin/vcf2sarge can take is a list of (minimum and maximum) coverage depth cutoffs per sample. This is extremely important to set when working with ancient data; a histogram of coverage depths can be produced from BCF/VCF using bin/vcf_depths. These can then be inspected to determine the correct coverage cutoffs before running bin/vcf2sarge.
+
+## Running SARGE
+
+The main program in SARGE is bin/sarge. It requires a \*.geno.gz file, \*.sites file, and a propagation distance. The propagation distance parameter describes how many bases (upstream and downstream) a given site is allowed to communicate its existence. Increasing this number will cause slower execution and more memory usage but will make somewhat better trees. Typically, there is a point of diminishing returns beyond which it is not useful to increase this parameter (it will only slow things down). SARGE creates an output file (gzipped binary format), along with a "recombination" file, which is a tab separated file of chromosome, start position, end position, upstream clade, downstream clade, and moving clade. 
+
+SARGE output can be indexed (bin/index) and retrieved using region syntax similar to the UCSC Genome Browser and SAMTools. This output can then be piped to the other programs (or just zcat the file to run on everything) for downstream analyses. If you want to export Newick-format trees that can be used in another program, run the program bin/trees2newick, which will output tab separated chromosome, position, and Newick-format tree. For example, to dump chromosome 12, site 100,000 to 200,000 in Newick format: 
+
+``bin/index [OUTPUTFILE] 12:100000-200000 | bin/trees2newick -v [HAPSFILE]``
+
+Currently, SARGE is designed to expect only one chromosome per set of input files, but this may change in the future.
+
+All programs should display a usage message if run with no arguments.
+
 
  
 
