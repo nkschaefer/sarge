@@ -29,8 +29,7 @@ void help(int code){
 input file at a time\n");
     fprintf(stderr, "    --ingroup -i One or more populations that are admixed (can \
 specify more than once)\n");
-   fprintf(stderr, "    --admixer -a The admixing population of interest\n");
-fprintf(stderr, "    --indvs -v The file containing names of individuals \n");
+    fprintf(stderr, "    --indvs -v The file containing names of individuals \n");
     fprintf(stderr, "    --pops -p A file mapping individual names to population names, \
 tab-separated\n");
     fprintf(stderr, "   --superpops -s A file mapping population IDs to superpop IDs (optional)\n");
@@ -88,7 +87,6 @@ int main(int argc, char *argv[]) {
        {"indvs", required_argument, 0, 'v'},
        {"bufsize", required_argument, 0, 'b'},
        {"ingroup", required_argument, 0, 'i'},
-       {"admixer", required_argument, 0, 'a'},
        {"indvs", required_argument, 0, 'v'},
        {"pops", required_argument, 0, 'p'},
        {"superpops", required_argument, 0, 's'},
@@ -100,7 +98,6 @@ int main(int argc, char *argv[]) {
     int num_haplotypes;
     string indvfilename;
     vector<string> ingroup_pops;
-    vector<string> admixers;
     string popfilename;
     string superpopfilename;
     bool superpops_given = false;
@@ -116,7 +113,7 @@ int main(int argc, char *argv[]) {
     if (argc == 1){
         help(0);
     }
-    while((ch = getopt_long(argc, argv, "v:b:i:a:v:p:s:h", long_options, &option_index )) != -1){
+    while((ch = getopt_long(argc, argv, "v:b:i:v:p:s:h", long_options, &option_index )) != -1){
         switch(ch){
             case 0:
                 // This option set a flag. No need to do anything here.
@@ -129,9 +126,6 @@ int main(int argc, char *argv[]) {
                 break;
             case 'i':
                 ingroup_pops.push_back(optarg);
-                break;
-            case 'a':
-                admixers.push_back(optarg);
                 break;
             case 'p':
                 popfilename = optarg;
