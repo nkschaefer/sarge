@@ -440,6 +440,7 @@ environment variables. Then recompile SARGE with HTSLIB=1.\n");
                     bcf_hdr_id2name(bcf_header, bcf_record->rid));
                 exit(1);
             }
+            prevchrom = chrom;
             
             // REALLY IMPORTANT NOTE: pos here is 0-based, whereas in VCF it's 1-based.
             if (start != -1 && bcf_record->pos + 1 < start){
