@@ -2,14 +2,23 @@
 from __future__ import division, print_function
 import sys
 from Bio import Phylo
-from ete3 import Tree, faces, AttrFace, TreeStyle, NodeStyle
+from ete3 import Tree, faces, AttrFace, TreeStyle, NodeStyle, TextFace
 from cStringIO import StringIO
+import matplotlib
+from matplotlib.colors import rgb2hex, LinearSegmentedColormap
 import argparse
 """
 view_trees.py
 Takes Newick format trees (or the output of trees2newick -- chrom<tab>pos<tab>newick)
     from stdin and displays them. Requires BioPython and a working X11
     connection.
+    
+    
+    NOTE: if ETE3 gives you an error importing the TextFace module,
+    make sure you've installed Qt5 (sudo apt-get install python-qtpy).
+    If Qt4 is still installed, you have to run sudo apt-get remove python-qt4
+    to avoid conflicts.
+    see here https://github.com/etetoolkit/ete/issues/195 
 """
 
 def parse_args():
@@ -21,11 +30,16 @@ def parse_args():
 "A file mapping population IDs to hex color codes", required=False, default=None)
     return parser.parse_args()
 
-def layout(node):
+def layout_default(node):
+    if node.is_leaf():
+        f = AttrFace("name", fsize=20)
+        faces.add_face_to_node(f, node, 0, position="branch-right")
+        
+def layout_popcols(node):
     if node.is_leaf():
         f = AttrFace("name", fsize=20)
         faces.add_face_to_node(f, node, 0, position="aligned")
-        
+
 def main(args):
     """Main method"""
     
@@ -66,6 +80,8 @@ IDs to hexadecimal color codes.", file=sys.stderr)
                     nodestyles[hap + '-2'] = ns2
         f.close()
     
+    grad = LinearSegmentedColormap.from_list('gradient2n', ['#003ac8', '#c80700'])
+    
     for line in sys.stdin:
         line = line.rstrip()
         data = line.split('\t')
@@ -86,11 +102,48 @@ IDs to hexadecimal color codes.", file=sys.stderr)
                 if leaf.name in nodestyles:
                     leaf.set_style(nodestyles[leaf.name])
         
+        if len(data) > 3:
+            # Parse metadata in 4th field.
+            meta = data[3].split(';')
+            max_pers = -1
+            clades_pers = []
+            for elt in meta:
+                leaves, persistence = elt.split(':')
+                persistence = int(persistence)
+                leaves_arr = leaves.split(',')
+                
+                if (len(leaves_arr) > 1):
+                    if persistence > max_pers:
+                        max_pers = persistence
+                    clades_pers.append((leaves_arr, persistence))
+                    
+            for tup in clades_pers:
+                node = tree.get_common_ancestor(tup[0])
+                # Add persistence value to node.
+                ns = NodeStyle()
+                ns['size'] = int(round((tup[1]/max_pers)*40))
+                col_rgb = grad(tup[1]/max_pers)
+                ns['fgcolor'] = rgb2hex(col_rgb)
+                #ns['fgcolor'] = '#A8CFEA'
+                node.set_style(ns)
+                node.add_face(TextFace(str(tup[1]), fsize=15), column=0, position="branch-right")
+                    
         ts = TreeStyle()
         ts.mode = 'c'      
-        ts.layout_fn = layout  
-        ts.show_leaf_name = False
+        # Hide normal leaf names if we're showing population colors - it'll be
+        # more useful to show stuff aligned at the tips in that case
+        
+        #if colors_given:
+        if True:
+            ts.layout_fn = layout_popcols
+            ts.show_leaf_name = False
+        else:
+            # Otherwise, just increase the default font size.
+            ts.layout_fn = layout_default
+            ts.show_leaf_name = False
+            
         tree.show(tree_style=ts)
+        
         #tree = Phylo.read(StringIO(newick), "newick")
         #Phylo.draw(tree, str, True, True, None, None, {"S_Kusunda-2-2": "#FF0000"})
         #Phylo.draw(tree, label_colors=({"Altai-1": "#FF0000"}))

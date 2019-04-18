@@ -13,6 +13,7 @@
 #include <regex>
 #include <map>
 #include <bitset>
+#include <unordered_set>
 
 class treeNode{
     private:
@@ -139,6 +140,7 @@ class treeNode{
         
         void to_dist_map(float, std::map<float, std::vector<treeNode*> >&);
         void flatten(std::vector<cladeset >&);
+        void flatten_set(std::unordered_set<cladeset>&);
         
         int clades_correct(treeNode* correct);
         int clades_tot();

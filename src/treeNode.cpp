@@ -14,6 +14,7 @@
 #include <cmath>
 #include <bitset>
 #include <zlib.h>
+#include <unordered_set>
 
 using namespace std;
 
@@ -999,6 +1000,17 @@ void treeNode::flatten(vector<cladeset >& flat){
     cladeset subtree = this->subtree_leaves();
     if (subtree.count() < this->num_haps && subtree.count() > 1){
         flat.push_back(subtree);
+    }
+}
+
+void treeNode::flatten_set(unordered_set<cladeset>& flat){
+    for (vector<treeNode*>::iterator child = this->children.begin();
+        child != this->children.end(); ++child){
+        (*child)->flatten_set(flat);
+    }
+    cladeset subtree = this->subtree_leaves();
+    if (subtree.count() < this->num_haps && subtree.count() > 1){
+        flat.insert(subtree);
     }
 }
 

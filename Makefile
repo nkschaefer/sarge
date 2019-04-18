@@ -21,7 +21,7 @@ OPTS += -stdlib=libc++
 endif
 CCOMP = gcc
 
-all: bin/sarge bin/trees2newick bin/index bin/index_geno bin/ms_tree_site bin/admix_scan bin/tmrcas_scan bin/dstat bin/upgma bin/vcf2sarge bin/vcf_depths bin/cpg_bed bin/ms2sarge
+all: bin/sarge bin/trees2newick bin/index bin/index_geno bin/ms_tree_site bin/admix_scan bin/tmrcas_scan bin/dstat bin/upgma bin/vcf2sarge bin/vcf_depths bin/cpg_bed bin/ms2sarge bin/haplens bin/dump_haplens
 
 bin/sarge: src/main.cpp $(OBJDEPS)
 	$(COMP) -std=c++11 $(OPTS) -g src/main.cpp -o bin/sarge $(OBJDEPS) -lz 
@@ -61,7 +61,13 @@ bin/cpg_bed: src/cpg_bed.c
 
 bin/ms2sarge: src/ms2sarge.cpp src/common.cpp src/treeNode.cpp $(OBJDEPS)
 	$(COMP) -std=c++11 $(OPTS) src/ms2sarge.cpp -o bin/ms2sarge $(OBJDEPS) -lz
-	
+
+bin/haplens: src/haplens.cpp src/common.cpp src/treeNode.cpp src/serialize.cpp $(OBJDEPS)
+	$(COMP) -std=c++11 $(OPTS) src/haplens.cpp -o bin/haplens $(OBJDEPS) -lz
+
+bin/dump_haplens: src/dump_haplens.cpp src/common.cpp src/treeNode.cpp  $(OBJDEPS)
+	$(COMP) -std=c++11 $(OPTS) src/dump_haplens.cpp -o bin/dump_haplens $(OBJDEPS) -lz
+
 serialize.o: src/serialize.cpp src/serialize.h
 	$(COMP) -std=c++11 $(OPTS) -g -c src/serialize.cpp
 

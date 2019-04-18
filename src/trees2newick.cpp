@@ -17,10 +17,61 @@ using std::cout;
 using std::endl;
 using namespace std;
 
-void print_site(treeNode& tree, string chrom, long int pos, bool use_hapnames, vector<string> hapnames, bool recomb){
+void print_persistence(treeNode* tree, bool use_hapnames, 
+    vector<string>& hapnames, vector<string>& text){
+    if (tree->persistence > 0 && tree->parent != NULL){
+        string clade_text = "";
+        set<unsigned int> leaves_set = bitset2set(tree->subtree_leaves(), tree->num_haps);
+        int i = 0; 
+        for (set<unsigned int>::iterator li = leaves_set.begin(); li != leaves_set.end();
+            ++li){
+            if (use_hapnames){
+                clade_text += hapnames[*li];
+            }
+            else{
+                char intstr[10];
+                sprintf(intstr, "%d", *li);
+                string intstr2 = intstr;
+                clade_text += intstr2;
+            }
+            if (i < leaves_set.size()-1){
+                clade_text += ",";
+            }
+            ++i;
+        }
+        clade_text += ":";
+        char pers_str[11];
+        sprintf(pers_str, "%ld", tree->persistence);
+        string pers_str2 = pers_str;
+        clade_text += pers_str2;
+        text.push_back(clade_text);
+    }
+    for (vector<treeNode*>::iterator child = tree->children.begin();
+        child != tree->children.end(); ++child){
+        print_persistence(*child, use_hapnames, hapnames, text);
+    }
+}
+
+void print_site(treeNode& tree, string chrom, long int pos, bool use_hapnames, 
+    vector<string>& hapnames, bool recomb, bool metadata){
     //float treedepth = tree.branchlens2percent();
     //float treedepth = 0;
-    fprintf(stdout, "%s\t%ld\t%s\n", chrom.c_str(), pos, tree.newick(recomb, use_hapnames, hapnames).c_str());    
+    fprintf(stdout, "%s\t%ld\t%s", chrom.c_str(), pos, tree.newick(recomb, use_hapnames, hapnames).c_str());    
+    if (metadata){
+        // Print leaf names, separated by commas, then colon and persistence time
+        vector<string> meta_text;
+        print_persistence(&tree, use_hapnames, hapnames, meta_text);
+        int i = 0;
+        fprintf(stdout, "\t");
+        for (vector<string>::iterator mt = meta_text.begin(); mt != meta_text.end(); ++mt){
+            fprintf(stdout, "%s", mt->c_str());
+            if (i < meta_text.size()-1){
+                fprintf(stdout, ";");
+            }
+            ++i;
+        } 
+    }
+    fprintf(stdout, "\n");
 }
 
 void divide_branches(treeNode* node, float rootdist){
@@ -103,6 +154,8 @@ nodes in trees (SITES FILE ALSO REQUIRED).\n");
 nodes in trees (ALLELES FILE ALSO REQUIRED).\n");
     fprintf(stderr, "   --pseudocount -p (OPTIONAL) set to add a small value to each branch \
 length, to make clades with 0 branch length more easy to see\n");
+    fprintf(stderr, "   --metadata -m (OPTIONAL) output metadata about nodes (i.e. persistence \
+along the chromosome) as an additional column. This can be read by view_trees.py.\n");
 exit(code);
 }
 
@@ -116,6 +169,7 @@ int main(int argc, char *argv[]) {
        {"alleles", required_argument, 0, 'a'},
        {"sites", required_argument, 0, 's'},
        {"pseudocount", required_argument, 0, 'p'},
+       {"metadata", no_argument, 0, 'm'},
        {"help", optional_argument, 0, 'h'},
        {0, 0, 0, 0} 
     };
@@ -129,6 +183,8 @@ int main(int argc, char *argv[]) {
     string locsfile;
     float pseudocount = 0.0;
     bool use_pseudocount = false;
+    bool metadata = false;
+    
     int site = -1;
     string outfile;
     
@@ -142,7 +198,7 @@ int main(int argc, char *argv[]) {
     if (argc == 1){
         help(0);
     }
-    while((ch = getopt_long(argc, argv, "v:n:b:S:o:a:s:p:dh", long_options, &option_index )) != -1){
+    while((ch = getopt_long(argc, argv, "v:n:b:S:o:a:s:p:mdh", long_options, &option_index )) != -1){
         switch(ch){
             case 0:
                 // This option set a flag. No need to do anything here.
@@ -158,6 +214,9 @@ int main(int argc, char *argv[]) {
                 break;
             case 'd':
                 derived_only = true;
+                break;
+            case 'm':
+                metadata = true;
                 break;
             case 'b':
                 bufsize = atoi(optarg);
@@ -265,12 +324,14 @@ if you want to annotate nodes.\n");
         
         if (use_pseudocount){
             add_pseudocount(&tree, pseudocount);
+            tree.dist = pseudocount;
+            tree.dist_norm = pseudocount;
         }
         else{
             tree.dist = 0.0;
             tree.dist_norm = 0.0;
         }
-        
+
         if (has_alleles){
             insert_alleles(&tree, alleles);
         }
@@ -299,7 +360,7 @@ if you want to annotate nodes.\n");
                 }
             }
         }
-        print_site(tree, chrom, pos, indvs_given, hapnames, false);
+        print_site(tree, chrom, pos, indvs_given, hapnames, false, metadata);
 
     }
     
