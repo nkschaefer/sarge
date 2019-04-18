@@ -91,8 +91,6 @@ human-readable Newick format with text haplotype labels inserted.\n");
 remove any haplotypes that are direct leaves of the root\n");
     fprintf(stderr, "   --bufsize -b (OPTIONAL) The number of characters to read from the \
 input file at a time\n");
-    fprintf(stderr, "   --recomb -r (OPTIONAL) specify to output modified Newick format that \
-indicates clades affected by recombination\n");
     fprintf(stderr, "   --flatten_root -f (OPTIONAL) specify to change root branch length to \
 0, in case there is a long root that prevents you from being able to see the other clades\n");
     fprintf(stderr, "   --site -S (OPTIONAL) a site position to create a FigTree annotation file for\n");
@@ -113,7 +111,6 @@ int main(int argc, char *argv[]) {
        {"indvs", optional_argument, 0, 'v'},
        {"derived", no_argument, 0, 'd'},
        {"bufsize", optional_argument, 0, 'b'},
-       {"recomb", no_argument, 0, 'r'},
        {"site", required_argument, 0, 'S'},
        {"outfile", required_argument, 0, 'o'},
        {"alleles", required_argument, 0, 'a'},
@@ -138,7 +135,6 @@ int main(int argc, char *argv[]) {
     int bufsize = 1048576;
     
     bool derived_only = false;
-    bool recomb = false;
     
     int option_index = 0;
     int ch;
@@ -146,7 +142,7 @@ int main(int argc, char *argv[]) {
     if (argc == 1){
         help(0);
     }
-    while((ch = getopt_long(argc, argv, "v:n:b:S:o:a:s:p:drh", long_options, &option_index )) != -1){
+    while((ch = getopt_long(argc, argv, "v:n:b:S:o:a:s:p:dh", long_options, &option_index )) != -1){
         switch(ch){
             case 0:
                 // This option set a flag. No need to do anything here.
@@ -162,9 +158,6 @@ int main(int argc, char *argv[]) {
                 break;
             case 'd':
                 derived_only = true;
-                break;
-            case 'r':
-                recomb = true;
                 break;
             case 'b':
                 bufsize = atoi(optarg);
@@ -273,8 +266,10 @@ if you want to annotate nodes.\n");
         if (use_pseudocount){
             add_pseudocount(&tree, pseudocount);
         }
-        tree.dist = 0.0;
-        tree.dist_norm = 0.0;
+        else{
+            tree.dist = 0.0;
+            tree.dist_norm = 0.0;
+        }
         
         if (has_alleles){
             insert_alleles(&tree, alleles);
@@ -304,7 +299,7 @@ if you want to annotate nodes.\n");
                 }
             }
         }
-        print_site(tree, chrom, pos, indvs_given, hapnames, recomb);
+        print_site(tree, chrom, pos, indvs_given, hapnames, false);
 
     }
     
