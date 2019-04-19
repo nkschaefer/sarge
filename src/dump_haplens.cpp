@@ -23,8 +23,8 @@ void print_haplens(treeNode* tree, int& traversal_index, string& chrom,
     if (tree->parent != NULL && tree->persistence > 0){
         cladeset st = tree->subtree_leaves();
         if (st.count() >= minsize && tree->persistence >= minlen){
-            fprintf(stdout, "%s\t%ld\t%d\t%ld\t%ld\n", chrom.c_str(), pos,
-                traversal_index, st.count(), tree->persistence);
+            fprintf(stdout, "%s\t%ld\t%d\t%ld\t%ld\t%f\n", chrom.c_str(), pos,
+                traversal_index, st.count(), tree->persistence, tree->dist_below/(tree->dist_below+tree->dist_above));
         }
     }
     traversal_index++;
@@ -128,6 +128,8 @@ to 1\n");
     
     long int last_printed = 0;
     long int progress = 5000;
+    
+    fprintf(stdout, "#chrom\tpos\ttrav_index\thaps\tpersistence\ttmrca\n");
     
     while(!is.finished()){
  
