@@ -31,7 +31,7 @@ void print_haplens(treeNode* tree, int& traversal_index, string& chrom,
             
             if (freqs_given){
                 // Calculate probability of clade size based on age
-                if (tmrca == 0 || tree->dist_below + tree->dist_above == 0){
+                if (tmrca == 0 || tree->dist_below + tree->dist_above == 0 || tmrca < ages_freqs.begin()->first.first){
                     tmrca = ages_freqs.begin()->first.first;
                 }
                 bool found = false;
@@ -51,11 +51,11 @@ void print_haplens(treeNode* tree, int& traversal_index, string& chrom,
                 }
                 if (!found){
                     fprintf(stderr, "\n?? !found\n");
-                    fprintf(stderr, "%Lf\n", tmrca);
-                    fprintf(stderr, "%f %f\n", tree->dist_below, tree->dist_above);
+                    fprintf(stderr, "%.8Lf\n", tmrca);
+                    fprintf(stderr, "%.8f %.8f\n", tree->dist_below, tree->dist_above);
                     for (map<pair<long double, long double>, vector<long double> >::iterator af = 
                         ages_freqs.begin(); af != ages_freqs.end(); ++af){
-                        fprintf(stderr, "%Lf %Lf\n", af->first.first, af->first.second);
+                        fprintf(stderr, "%.8Lf %.8Lf\n", af->first.first, af->first.second);
                     }
                     exit(1);
                 }
@@ -120,6 +120,7 @@ void parse_freqs_file(string freqsfile, map<pair<long double, long double>, vect
             ages_freqs.insert(make_pair(make_pair(lower, upper), vals));
         }   
     }
+    exit(1);
 }
 
 /**
