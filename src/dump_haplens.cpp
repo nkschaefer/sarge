@@ -20,7 +20,8 @@ using namespace std;
 
 void print_haplens(treeNode* tree, int& traversal_index, string& chrom, 
     long int pos, long int minsize, long int minlen, bool freqs_given,
-    map<pair<long double, long double>, vector<long double> >& ages_freqs, float p_cutoff){
+    map<pair<long double, long double>, vector<long double> >& ages_freqs, float p_cutoff,
+    float tmrca_cutoff){
     if (tree->parent != NULL && tree->persistence > 0){
         cladeset st = tree->subtree_leaves();
         if (st.count() >= minsize && tree->persistence >= minlen){
@@ -28,48 +29,50 @@ void print_haplens(treeNode* tree, int& traversal_index, string& chrom,
             if (tree->dist_below + tree->dist_above == 0){
                 tmrca = 0;
             }
-            
-            if (freqs_given){
-                // Calculate probability of clade size based on age
-                if (tmrca == 0 || tree->dist_below + tree->dist_above == 0 || tmrca < ages_freqs.begin()->first.first){
-                    tmrca = ages_freqs.begin()->first.first;
-                }
-                bool found = false;
-                for (map<pair<long double, long double>, vector<long double> >::iterator af = 
-                    ages_freqs.begin(); af != ages_freqs.end(); ++af){
-                    if (tmrca >= af->first.first && tmrca < af->first.second){
-                        found = true;
-                        double probsum = 0;
-                        for (int i = st.count()-1; i < af->second.size(); ++i){
-                            probsum += af->second[i];
-                        }
-                        if (p_cutoff == 1 || probsum < p_cutoff){
-                            fprintf(stdout, "%s\t%ld\t%d\t%ld\t%ld\t%Lf\t%f\n", chrom.c_str(), pos,
-                                traversal_index, st.count(), tree->persistence, tmrca, probsum);
-                        }
+            if (tmrca <= tmrca_cutoff){
+                if (freqs_given){
+                    // Calculate probability of clade size based on age
+                    if (tmrca == 0 || tree->dist_below + tree->dist_above == 0 || tmrca < ages_freqs.begin()->first.first){
+                        tmrca = ages_freqs.begin()->first.first;
                     }
-                }
-                if (!found){
-                    fprintf(stderr, "\n?? !found\n");
-                    fprintf(stderr, "%.8Lf\n", tmrca);
-                    fprintf(stderr, "%.8f %.8f\n", tree->dist_below, tree->dist_above);
+                    bool found = false;
                     for (map<pair<long double, long double>, vector<long double> >::iterator af = 
                         ages_freqs.begin(); af != ages_freqs.end(); ++af){
-                        fprintf(stderr, "%.8Lf %.8Lf\n", af->first.first, af->first.second);
+                        if (tmrca >= af->first.first && tmrca < af->first.second){
+                            found = true;
+                            double probsum = 0;
+                            for (int i = st.count()-1; i < af->second.size(); ++i){
+                                probsum += af->second[i];
+                            }
+                            if (p_cutoff == 1 || probsum < p_cutoff){
+                                fprintf(stdout, "%s\t%ld\t%d\t%ld\t%ld\t%Lf\t%f\n", chrom.c_str(), pos,
+                                    traversal_index, st.count(), tree->persistence, tmrca, probsum);
+                            }
+                        }
                     }
-                    exit(1);
+                    if (!found){
+                        fprintf(stderr, "\n?? !found\n");
+                        fprintf(stderr, "%.8Lf\n", tmrca);
+                        fprintf(stderr, "%.8f %.8f\n", tree->dist_below, tree->dist_above);
+                        for (map<pair<long double, long double>, vector<long double> >::iterator af = 
+                            ages_freqs.begin(); af != ages_freqs.end(); ++af){
+                            fprintf(stderr, "%.8Lf %.8Lf\n", af->first.first, af->first.second);
+                        }
+                        exit(1);
+                    }
                 }
-            }
-            else{
-                fprintf(stdout, "%s\t%ld\t%d\t%ld\t%ld\t%Lf\n", chrom.c_str(), pos,
-                    traversal_index, st.count(), tree->persistence, tmrca);
+                else{
+                    fprintf(stdout, "%s\t%ld\t%d\t%ld\t%ld\t%Lf\n", chrom.c_str(), pos,
+                        traversal_index, st.count(), tree->persistence, tmrca);
+                }
             }
         }
     }
     traversal_index++;
     for (vector<treeNode*>::iterator child = tree->children.begin(); child !=
         tree->children.end(); ++child){
-        print_haplens(*child, traversal_index, chrom, pos, minsize, minlen, freqs_given, ages_freqs, p_cutoff);
+        print_haplens(*child, traversal_index, chrom, pos, minsize, minlen, freqs_given, 
+            ages_freqs, p_cutoff, tmrca_cutoff);
     }
 }
 
@@ -140,6 +143,8 @@ persist in order to be printed (must be >= 1)\n");
 based on TMRCA, provide table computed by utilities/calc_ages_freqs.py\n");
     fprintf(stderr, "   --p_cutoff -p (OPTIONAL) if providing a frequency table (-f argument), \
 the maximum p-value allowed to print a clade\n");
+    fprintf(stderr, "   --tmrca_cutoff, -t (OPTIONAL) a TMRCA value (as percent of total divergence \
+to outgroup) above which not to print clades\n");
     exit(code);
 }
 
@@ -151,6 +156,7 @@ int main(int argc, char *argv[]) {
        {"length", required_argument, 0, 'l'},
        {"freqs", required_argument, 0, 'f'},
        {"p_cutoff", required_argument, 0, 'p'},
+       {"tmrca_cutoff", required_argument, 0, 't'},
        {0, 0, 0, 0} 
     };
     
@@ -161,6 +167,7 @@ int main(int argc, char *argv[]) {
     string freqsfile;
     bool freqs_given = false;
     float p_cutoff = 1.0;
+    float tmrca_cutoff = 1.0;
     
     int ch;
     /*
@@ -168,7 +175,7 @@ int main(int argc, char *argv[]) {
         help(0);
     }
     */
-    while((ch = getopt_long(argc, argv, "b:s:l:f:p:h", long_options, &option_index )) != -1){
+    while((ch = getopt_long(argc, argv, "b:s:l:f:p:t:h", long_options, &option_index )) != -1){
         switch(ch){
             case 0:
                 // This option set a flag. No need to do anything here.
@@ -188,6 +195,9 @@ int main(int argc, char *argv[]) {
                 break;
             case 'p':
                 p_cutoff = atof(optarg);
+                break;
+            case 't':
+                tmrca_cutoff = atof(optarg);
                 break;
             case '?':
                 //help(0);
@@ -213,7 +223,11 @@ to 1\n");
         fprintf(stderr, "ERROR: you cannot specify a p-value cutoff without a frequency table\n");
         exit(1);
     }
-
+    if (tmrca_cutoff <= 0.0 || tmrca_cutoff > 1.0){
+        fprintf(stderr, "ERROR: invalid TMRCA cutoff given.\n");
+        exit(1);
+    }
+    
     FILE *instream = stdin;
     if (instream == NULL){
         fprintf(stderr, "Error opening input stream\n");
@@ -257,7 +271,7 @@ to 1\n");
         tree->set_haps(num_haplotypes);
         read_sitedata(num_haplotypes, is, chrom, pos, *tree);
         int ti = 0;
-        print_haplens(tree, ti, chrom, pos, minsize, minlen, freqs_given, ages_freqs, p_cutoff);
+        print_haplens(tree, ti, chrom, pos, minsize, minlen, freqs_given, ages_freqs, p_cutoff, tmrca_cutoff);
         delete tree;
     }
     
