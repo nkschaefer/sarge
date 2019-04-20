@@ -44,7 +44,7 @@ void print_haplens(treeNode* tree, int& traversal_index, string& chrom,
                             probsum += af->second[i];
                         }
                         if (p_cutoff == 1 || probsum < p_cutoff){
-                            fprintf(stdout, "%s\t%ld\t%d\t%ld\t%ld\t%Lf\t%f", chrom.c_str(), pos,
+                            fprintf(stdout, "%s\t%ld\t%d\t%ld\t%ld\t%Lf\t%f\n", chrom.c_str(), pos,
                                 traversal_index, st.count(), tree->persistence, tmrca, probsum);
                         }
                     }
