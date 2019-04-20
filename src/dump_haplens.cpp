@@ -120,7 +120,6 @@ void parse_freqs_file(string freqsfile, map<pair<long double, long double>, vect
             ages_freqs.insert(make_pair(make_pair(lower, upper), vals));
         }   
     }
-    exit(1);
 }
 
 /**
