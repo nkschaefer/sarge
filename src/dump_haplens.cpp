@@ -19,12 +19,13 @@ using std::endl;
 using namespace std;
 
 void print_haplens(treeNode* tree, int& traversal_index, string& chrom, 
-    long int pos, long int minsize, long int minlen, bool freqs_given,
+    long int pos, long int minsize, long int maxsize, long int minlen, bool freqs_given,
     map<pair<long double, long double>, vector<long double> >& ages_freqs, float p_cutoff,
     float tmrca_cutoff){
     if (tree->parent != NULL && tree->persistence > 0){
         cladeset st = tree->subtree_leaves();
-        if (st.count() >= minsize && tree->persistence >= minlen){
+        if (st.count() >= minsize && tree->persistence >= minlen && (maxsize == -1 ||
+            st.count() <= maxsize)){
             long double tmrca = tree->dist_below/(tree->dist_below+tree->dist_above);
             if (tree->dist_below + tree->dist_above == 0){
                 tmrca = 0;
@@ -71,7 +72,7 @@ void print_haplens(treeNode* tree, int& traversal_index, string& chrom,
     traversal_index++;
     for (vector<treeNode*>::iterator child = tree->children.begin(); child !=
         tree->children.end(); ++child){
-        print_haplens(*child, traversal_index, chrom, pos, minsize, minlen, freqs_given, 
+        print_haplens(*child, traversal_index, chrom, pos, minsize, maxsize, minlen, freqs_given, 
             ages_freqs, p_cutoff, tmrca_cutoff);
     }
 }
@@ -135,8 +136,10 @@ haplens program), this prints clade sizes and persistences in tab-delimited form
     fprintf(stderr, "[OPTIONS]:\n");
     fprintf(stderr, "   --bufsize -b (OPTIONAL) The number of characters to read from the \
 input file at a time\n");
-    fprintf(stderr, "   --size -s (OPTIONAL) minimum number of haplotypes for a clade \
+    fprintf(stderr, "   --minsize -s (OPTIONAL) minimum number of haplotypes for a clade \
 to contain in order to be printed (must be > 1)\n");
+    fprintf(stderr, "   --maxsize -S (OPTIONAL) maximum number of haplotypes for a clade \
+to contain in order to be printed (must be < num hapotypes -1)\n");
     fprintf(stderr, "   --length -l (OPTIONAL) minimum number of bases for a clade to \
 persist in order to be printed (must be >= 1)\n");
     fprintf(stderr, "   --freqs -f (OPTIONAL) to calculate probabilities of clade sizes \
@@ -152,7 +155,8 @@ int main(int argc, char *argv[]) {
     static struct option long_options[] = {
        {"bufsize", required_argument, 0, 'b'},
        {"help", optional_argument, 0, 'h'},
-       {"size", required_argument, 0, 's'},
+       {"minsize", required_argument, 0, 's'},
+       {"maxsize", required_argument, 0, 'S'},
        {"length", required_argument, 0, 'l'},
        {"freqs", required_argument, 0, 'f'},
        {"p_cutoff", required_argument, 0, 'p'},
@@ -162,6 +166,7 @@ int main(int argc, char *argv[]) {
     
     int bufsize = 1048576;
     long int minsize = 2;
+    long int maxsize = -1;
     long int minlen = 1;
     int option_index = 0;
     string freqsfile;
@@ -175,7 +180,7 @@ int main(int argc, char *argv[]) {
         help(0);
     }
     */
-    while((ch = getopt_long(argc, argv, "b:s:l:f:p:t:h", long_options, &option_index )) != -1){
+    while((ch = getopt_long(argc, argv, "b:s:S:l:f:p:t:h", long_options, &option_index )) != -1){
         switch(ch){
             case 0:
                 // This option set a flag. No need to do anything here.
@@ -185,6 +190,9 @@ int main(int argc, char *argv[]) {
                 break;
             case 's':
                 minsize = atol(optarg);
+                break;
+            case 'S':
+                maxsize = atol(optarg);
                 break;
             case 'l':
                 minlen = atol(optarg);
@@ -254,6 +262,11 @@ to 1\n");
     
     fprintf(stderr, "Read %d haplotypes\n", num_haplotypes);
     
+    if (maxsize != -1 && maxsize > num_haplotypes-1){
+        fprintf(stderr, "ERROR: maximum clade size must be <= %d\n", num_haplotypes-1);
+        exit(1);
+    }
+    
     long int last_printed = 0;
     long int progress = 5000;
     
@@ -271,7 +284,7 @@ to 1\n");
         tree->set_haps(num_haplotypes);
         read_sitedata(num_haplotypes, is, chrom, pos, *tree);
         int ti = 0;
-        print_haplens(tree, ti, chrom, pos, minsize, minlen, freqs_given, ages_freqs, p_cutoff, tmrca_cutoff);
+        print_haplens(tree, ti, chrom, pos, minsize, maxsize, minlen, freqs_given, ages_freqs, p_cutoff, tmrca_cutoff);
         delete tree;
     }
     
