@@ -215,4 +215,7 @@ int main(int argc, char *argv[]) {
         delete pt->second;
         prevtrees.erase(pt++);
     }
+    
+    gzclose(outp);
+    
 }
