@@ -1885,10 +1885,20 @@ Files should contain the same number of sites.\n", numsites, locs.size());
     }
     
     gzFile main_out;
-    main_out = gzopen(mainoutfn.c_str(), "wb");
-    if (!main_out){
-        fprintf(stderr, "ERROR opening file %s for writing.\n", mainoutfn.c_str());
-        exit(1);
+    if (mainoutfn == "-"){
+        // Write to stdout.
+        main_out = gzdopen(fileno(stdout), "wb");
+        if (main_out == NULL){
+            fprintf(stderr, "ERROR: can't open stdout for writing.\n");
+            exit(1);
+        }
+    }
+    else{
+        main_out = gzopen(mainoutfn.c_str(), "wb");
+        if (!main_out){
+            fprintf(stderr, "ERROR opening file %s for writing.\n", mainoutfn.c_str());
+            exit(1);
+        }
     }
     
     if (!no_header){

@@ -18,19 +18,64 @@ using std::cout;
 using std::endl;
 using namespace std;
 
-void print_haplens(treeNode* tree, int& traversal_index, string& chrom, 
-    long int pos, long int minsize, long int maxsize, long int minlen, bool freqs_given,
-    map<pair<long double, long double>, vector<long double> >& ages_freqs, float p_cutoff,
-    float tmrca_cutoff, bool use_selected_haps, cladeset& selected_haps){
+// Store information about an individual clade
+struct haplen_dat{
+    int traversal_index;
+    long int size;
+    long int persistence;
+    float tmrca;
+    float tmrca_p;
+    bool selected_haps;
+    
+    haplen_dat(int ti, long int s, float pers, float t, float p, bool sh){
+        this->traversal_index = ti;
+        this->size = s;
+        this->persistence = pers;
+        this->tmrca = t;
+        this->tmrca_p = p;
+        this->selected_haps = sh;
+    };
+};
+
+bool operator<(const haplen_dat& h1, const haplen_dat& h2){
+    if (h1.persistence > h2.persistence){
+        return true;
+    }
+    else{
+        return false;
+    }
+}
+
+bool p_comp(const haplen_dat& h1, const haplen_dat& h2){
+    if (h1.tmrca_p < h2.tmrca_p){
+        return true;
+    }
+    else{
+        return false;
+    }
+}
+
+void compile_haplens(treeNode* tree, 
+    int& traversal_index, 
+    bool freqs_given,
+    map<pair<long double, long double>, vector<long double> >& ages_freqs,  
+    bool use_selected_haps, 
+    cladeset& selected_haps,
+    vector<haplen_dat>& haps){
+    
     if (tree->parent != NULL && tree->persistence > 0){
         cladeset st = tree->subtree_leaves();
-        if (st.count() >= minsize && tree->persistence >= minlen && (maxsize == -1 ||
-            st.count() <= maxsize) && (!use_selected_haps || (st & selected_haps).count() > 0)){
+        
+        if (st.count() > 1 && st.count() < tree->num_haps){
+        //if (st.count() >= minsize && tree->persistence >= minlen && (maxsize == -1 ||
+        //    st.count() <= maxsize) && (!use_selected_haps || (st & selected_haps).count() > 0)){
             long double tmrca = tree->dist_below/(tree->dist_below+tree->dist_above);
             if (tree->dist_below + tree->dist_above == 0){
                 tmrca = 0;
             }
-            if (tmrca <= tmrca_cutoff){
+            
+            if (true){
+            //if (tmrca <= tmrca_cutoff){
                 if (freqs_given){
                     // Calculate probability of clade size based on age
                     if (tmrca == 0 || tree->dist_below + tree->dist_above == 0 || tmrca < ages_freqs.begin()->first.first){
@@ -45,9 +90,21 @@ void print_haplens(treeNode* tree, int& traversal_index, string& chrom,
                             for (int i = st.count()-1; i < af->second.size(); ++i){
                                 probsum += af->second[i];
                             }
-                            if (p_cutoff == 1 || probsum < p_cutoff){
-                                fprintf(stdout, "%s\t%ld\t%d\t%ld\t%ld\t%Lf\t%f\n", chrom.c_str(), pos,
-                                    traversal_index, st.count(), tree->persistence, tmrca, probsum);
+                            if (true){
+                            //if (p_cutoff == 1 || probsum < p_cutoff){
+                                bool has_selected_haps = true;
+                                if (use_selected_haps){
+                                    if ((st & selected_haps).count() > 0){
+                                        has_selected_haps = true;
+                                    }
+                                    else{
+                                        has_selected_haps = false;
+                                    }
+                                }
+                                haps.push_back(haplen_dat(traversal_index, st.count(), 
+                                    tree->persistence, tmrca, probsum, has_selected_haps));
+                                //fprintf(stdout, "%s\t%ld\t%d\t%ld\t%ld\t%Lf\t%f\n", chrom.c_str(), pos,
+                                //    traversal_index, st.count(), tree->persistence, tmrca, probsum);
                             }
                         }
                     }
@@ -63,8 +120,19 @@ void print_haplens(treeNode* tree, int& traversal_index, string& chrom,
                     }
                 }
                 else{
-                    fprintf(stdout, "%s\t%ld\t%d\t%ld\t%ld\t%Lf\n", chrom.c_str(), pos,
-                        traversal_index, st.count(), tree->persistence, tmrca);
+                    //fprintf(stdout, "%s\t%ld\t%d\t%ld\t%ld\t%Lf\n", chrom.c_str(), pos,
+                    //    traversal_index, st.count(), tree->persistence, tmrca);
+                    bool has_selected_haps = true;
+                    if (use_selected_haps){
+                        if ((st & selected_haps).count() > 0){
+                            has_selected_haps = true;
+                        }
+                        else{
+                            has_selected_haps = false;
+                        }
+                    }
+                    haps.push_back(haplen_dat(traversal_index, st.count(),
+                        tree->persistence, tmrca, -1, has_selected_haps));
                 }
             }
         }
@@ -72,8 +140,133 @@ void print_haplens(treeNode* tree, int& traversal_index, string& chrom,
     traversal_index++;
     for (vector<treeNode*>::iterator child = tree->children.begin(); child !=
         tree->children.end(); ++child){
-        print_haplens(*child, traversal_index, chrom, pos, minsize, maxsize, minlen, freqs_given, 
-            ages_freqs, p_cutoff, tmrca_cutoff, use_selected_haps, selected_haps);
+        compile_haplens(*child, traversal_index, freqs_given, 
+            ages_freqs, use_selected_haps, selected_haps, haps);
+    }
+}
+
+void print_haplens(vector<haplen_dat>& haps, 
+    string& chrom, 
+    long int pos, 
+    bool freqs_given,
+    long int minsize, 
+    long int maxsize, 
+    long int minlen, 
+    float p_cutoff,
+    float tmrca_cutoff){
+    
+    // Map traversal index to rank percentile (two different ways)
+    map<int, float> rank_persistence;
+    map<int, float> rank_tmrca_p;
+    
+    float pers_sum = 0;
+    float tmrca_p_sum = 0;
+    for (vector<haplen_dat>::iterator h = haps.begin(); h != haps.end(); ++h){
+        pers_sum += h->persistence;
+        if (freqs_given){
+            tmrca_p_sum += h->tmrca_p;
+        }
+    }
+    float tmrca_p_mean = 0;
+    float pers_mean = 0;
+    if (haps.size() > 0){
+        pers_mean = (float)pers_sum/(float)haps.size();
+        if (freqs_given){
+            tmrca_p_mean = (float)tmrca_p_sum/(float)haps.size();
+        }
+    }
+    
+    for (vector<haplen_dat>::iterator hap = haps.begin(); hap != haps.end(); ++hap){
+        if (hap->selected_haps && hap->tmrca <= tmrca_cutoff && 
+            (minsize == -1 || hap->size >= minsize) &&
+            (maxsize == -1 || hap->size <= maxsize) && 
+            hap->persistence >= minlen &&
+            (!freqs_given || hap->tmrca_p <= p_cutoff)){
+            fprintf(stdout, "%s\t%ld\t%d\t%ld\t%ld\t%f", chrom.c_str(), pos, hap->traversal_index,
+                hap->size, hap->persistence, hap->tmrca);
+            if (freqs_given){
+                fprintf(stdout, "\t%f", hap->tmrca_p);
+            } 
+            float p_persistence = exp(-1.0/pers_mean*hap->persistence);
+            fprintf(stdout, "\t%f", p_persistence);
+            if (freqs_given){
+                float p_tmrca = 1-exp(-1.0/tmrca_p_mean*hap->tmrca_p);
+                fprintf(stdout, "\t%f\t%f", p_tmrca,
+                    p_persistence*p_tmrca);
+            }
+            fprintf(stdout, "\n");
+        }
+    }
+    
+    
+    return;
+    
+    
+    static int count = 0;
+    count++;
+    if (count == 1000){
+    for (vector<haplen_dat>::iterator h = haps.begin(); h != haps.end(); ++h){
+        fprintf(stderr, "%f\t%ld\t%ld\n", h->tmrca, h->size, h->persistence);   
+    }
+    exit(1);
+    }
+    if (freqs_given){
+        // Sort in increasing order of TMRCA p-value
+        sort(haps.begin(), haps.end(), p_comp);
+        int i = 0;
+        for (vector<haplen_dat>::iterator h = haps.begin(); h != haps.end(); ++h){
+            int count_geq = i;
+            vector<haplen_dat>::iterator h2 = h;
+            while (h2 != haps.end()){
+                if (h2->tmrca_p == h->tmrca_p){
+                    ++count_geq;
+                }
+                else{
+                    break;
+                }
+                ++h2;
+            }
+            rank_tmrca_p.insert(make_pair(h->traversal_index, (float)count_geq/(float)haps.size()));
+        }
+    }
+    
+    // Sort in decreasing order of persistence
+    sort(haps.begin(), haps.end());
+    int i = 0;
+    for (vector<haplen_dat>::iterator h = haps.begin(); h != haps.end(); ++h){
+        int count_geq = i;
+        vector<haplen_dat>::iterator h2 = h;
+        while (h2 != haps.end()){
+            if (h2->persistence == h->persistence){
+                ++count_geq;
+            }
+            else{
+                break;
+            }
+            ++h2;
+        }
+        rank_persistence.insert(make_pair(h->traversal_index, (float)count_geq/(float)haps.size()));
+        ++i;
+    }
+
+    for (vector<haplen_dat>::iterator hap = haps.begin(); hap != haps.end(); ++hap){
+        if (hap->selected_haps && hap->tmrca <= tmrca_cutoff && 
+            (minsize == -1 || hap->size >= minsize) &&
+            (maxsize == -1 || hap->size <= maxsize) && 
+            hap->persistence >= minlen &&
+            (!freqs_given || hap->tmrca_p <= p_cutoff)){
+            fprintf(stdout, "%s\t%ld\t%d\t%ld\t%ld\t%f", chrom.c_str(), pos, hap->traversal_index,
+                hap->size, hap->persistence, hap->tmrca);
+            if (freqs_given){
+                fprintf(stdout, "\t%f", hap->tmrca_p);
+            } 
+            fprintf(stdout, "\t%f", rank_persistence[hap->traversal_index]);
+            if (freqs_given){
+                fprintf(stdout, "\t%f\t%f", rank_tmrca_p[hap->traversal_index],
+                    rank_persistence[hap->traversal_index]*rank_tmrca_p[hap->traversal_index]);
+            }
+            fprintf(stdout, "\n");
+        }
     }
 }
 
@@ -327,6 +520,7 @@ not specified the haplotype/population mapping file -p.\n");
     
     map<string, string> indv2pop; 
     map<string, vector<string> > pop2indv;
+    set<unsigned int> selected_haps_set;
     cladeset selected_haps;
     bool use_selected_haps = false;
     if (popsfile_given && hapsfile_given && include_pops.size() > 0){
@@ -339,10 +533,13 @@ not specified the haplotype/population mapping file -p.\n");
             for (vector<string>::iterator hapname = pop2indv[*pop].begin();
                 hapname != pop2indv[*pop].end(); ++hapname){
                 int hapind = str2hap[*hapname];
-                selected_haps.set(num_haplotypes-1-hapind);
+                //selected_haps.set(num_haplotypes-1-hapind);
+                selected_haps_set.insert((unsigned int)hapind);
             }   
         }
+        selected_haps = set2bitset(selected_haps_set, num_haplotypes);
     }
+    
     
     long int last_printed = 0;
     long int progress = 5000;
@@ -351,19 +548,24 @@ not specified the haplotype/population mapping file -p.\n");
     if (freqs_given){
         fprintf(stdout, "\tp");
     }
+    fprintf(stdout, "\trank_pers");
+    if (freqs_given){
+        fprintf(stdout, "\trank_tmrca_p\tcombined_p");
+    }
     fprintf(stdout, "\n");
     
     while(!is.finished()){
- 
         string chrom;
         long int pos;
         treeNode* tree = new treeNode();
         tree->set_haps(num_haplotypes);
         read_sitedata(num_haplotypes, is, chrom, pos, *tree);
         int ti = 0;
-        print_haplens(tree, ti, chrom, pos, minsize, maxsize, minlen, 
-            freqs_given, ages_freqs, p_cutoff, tmrca_cutoff, use_selected_haps,
-            selected_haps);
+        vector<haplen_dat> haps;
+        compile_haplens(tree, ti, freqs_given, ages_freqs, use_selected_haps,
+            selected_haps, haps);
+        print_haplens(haps, chrom, pos, freqs_given, minsize, maxsize, minlen,
+            p_cutoff, tmrca_cutoff);
         delete tree;
     }
     

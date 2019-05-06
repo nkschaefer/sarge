@@ -31,6 +31,9 @@ field of each clade populated. This can then be accessed by other programs.\n");
 input file at a time\n");
     fprintf(stderr, "   --out -o The name of the output file to create. Output will be \
 in gzipped binary format.\n");
+    fprintf(stderr, "   --prop_dist -p (OPTIONAL) The length each mutation was allowed to persist \
+when the ARG was inferred. If two sites are more than 2* this distance apart, clades \
+will be not be inferred to span across the distance between.\n");
     exit(code);
 }
 
@@ -38,12 +41,14 @@ int main(int argc, char *argv[]) {
     static struct option long_options[] = {
        {"bufsize", required_argument, 0, 'b'},
        {"out", required_argument, 0, 'o'},
+       {"prop_dist", required_argument, 0, 'p'},
        {"help", optional_argument, 0, 'h'},
        {0, 0, 0, 0} 
     };
     
     int bufsize = 1048576;
     string outname;
+    int prop_dist = -1;
     
     int option_index = 0;
     int ch;
@@ -51,7 +56,7 @@ int main(int argc, char *argv[]) {
     if (argc == 1){
         help(0);
     }
-    while((ch = getopt_long(argc, argv, "b:o:h", long_options, &option_index )) != -1){
+    while((ch = getopt_long(argc, argv, "b:o:p:h", long_options, &option_index )) != -1){
         switch(ch){
             case 0:
                 // This option set a flag. No need to do anything here.
@@ -61,6 +66,9 @@ int main(int argc, char *argv[]) {
                 break;
             case 'o':
                 outname = optarg;
+                break;
+            case 'p':
+                prop_dist = atoi(optarg);
                 break;
             case '?':
                 //help(0);
@@ -89,10 +97,20 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
     
-    gzFile outp = gzopen(outname.c_str(), "wb");
-    if (outp == NULL){
-        fprintf(stderr, "ERROR: unable to open file %s for writing.\n", outname.c_str());
-        exit(1);
+    gzFile outp = NULL;
+    if (outname == "-"){
+        outp = gzdopen(fileno(stdout), "wb");
+        if (outp == NULL){
+            fprintf(stderr, "ERROR: unable to open stdout for writing.\n");
+            exit(1);
+        }
+    }
+    else{
+        outp = gzopen(outname.c_str(), "wb");
+        if (outp == NULL){
+            fprintf(stderr, "ERROR: unable to open file %s for writing.\n", outname.c_str());
+            exit(1);
+        }
     }
     
     instream_info is;
@@ -131,20 +149,23 @@ int main(int argc, char *argv[]) {
         
         unordered_set<cladeset> curtree_flat;
         tree->flatten_set(curtree_flat);
-        for (map<long int, treeNode*>::iterator pt = prevtrees.begin(); 
-            pt != prevtrees.end(); ++pt){
-            for (multimap<treeNode*, cladeset>::iterator pc = 
-                tree_clades.equal_range(pt->second).first; pc != 
-                tree_clades.equal_range(pt->second).second;){
-                if (curtree_flat.find(pc->second) == curtree_flat.end()){
-                    // Not found in current tree.
-                    // Determine distance that clade exists.
+        
+        if (prop_dist != -1 && pos - prevpos > 2*prop_dist){
+            // Too much space in between sites. We can't really infer clades
+            // to span this distance, since it might be across a centromere,
+            // etc.
+            for (map<long int, treeNode*>::iterator pt = prevtrees.begin();
+                pt != prevtrees.end(); ++pt){
+                // Delete all stored clades tied to this tree.
+                for (multimap<treeNode*, cladeset>::iterator pc = 
+                    tree_clades.equal_range(pt->second).first; 
+                    pc != tree_clades.equal_range(pt->second).second;){
+                    // End clades at previous site (pre-gap)
                     long int dist = prevpos - pt->first + 1;
                     treeNode* clade = pt->second->get_clade_match(pc->second);
                     if (clade == NULL){
                         fprintf(stderr, "ERROR: clade not found in tree\n");
                         print_bitset_set(pc->second, num_haplotypes);
-                        //print_node_lite(pt->second, num_haplotypes);
                         exit(1);
                     }
                     else{
@@ -152,27 +173,59 @@ int main(int argc, char *argv[]) {
                     }
                     tree_clades.erase(pc++);
                 }
-                else{
-                    // Found in current tree.
-                    ++pc;
-                }
             }
-        }
-        // Erase and print out anything already fully processed.
-        for (map<long int, treeNode*>::iterator pt = prevtrees.begin();
-            pt != prevtrees.end();){
-            if (tree_clades.find(pt->second) == tree_clades.end()){
-                // No clades still stored for this tree. We're done with it.
+            for (map<long int, treeNode*>::iterator pt = prevtrees.begin();
+                pt != prevtrees.end();){
                 serialize_sitedata(outp, chrom, pt->first, *pt->second);
                 delete pt->second;
                 prevtrees.erase(pt++);
             }
-            else{
-                // Not done with this tree, so don't try to print anything that
-                // comes after it yet.
-                break;
+        }
+        else{
+            for (map<long int, treeNode*>::iterator pt = prevtrees.begin(); 
+                pt != prevtrees.end(); ++pt){
+                for (multimap<treeNode*, cladeset>::iterator pc = 
+                    tree_clades.equal_range(pt->second).first; pc != 
+                    tree_clades.equal_range(pt->second).second;){
+                    if (curtree_flat.find(pc->second) == curtree_flat.end()){
+                        // Not found in current tree.
+                        // Determine distance that clade exists.
+                        long int dist = prevpos - pt->first + 1;
+                        treeNode* clade = pt->second->get_clade_match(pc->second);
+                        if (clade == NULL){
+                            fprintf(stderr, "ERROR: clade not found in tree\n");
+                            print_bitset_set(pc->second, num_haplotypes);
+                            //print_node_lite(pt->second, num_haplotypes);
+                            exit(1);
+                        }
+                        else{
+                            clade->persistence = dist;
+                        }
+                        tree_clades.erase(pc++);
+                    }
+                    else{
+                        // Found in current tree.
+                        ++pc;
+                    }
+                }
+            }
+            // Erase and print out anything already fully processed.
+            for (map<long int, treeNode*>::iterator pt = prevtrees.begin();
+                pt != prevtrees.end();){
+                if (tree_clades.find(pt->second) == tree_clades.end()){
+                    // No clades still stored for this tree. We're done with it.
+                    serialize_sitedata(outp, chrom, pt->first, *pt->second);
+                    delete pt->second;
+                    prevtrees.erase(pt++);
+                }
+                else{
+                    // Not done with this tree, so don't try to print anything that
+                    // comes after it yet.
+                    break;
+                }
             }
         }
+        
         // Store stuff from current tree in the data structure.
         for (unordered_set<cladeset>::iterator cl = curtree_flat.begin();
             cl != curtree_flat.end();){
