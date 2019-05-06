@@ -33,6 +33,22 @@ def main(args):
     
     print("winsize\tmean\tsd")
     
+    # Determine how many haplotypes are in the input file
+    p1 = subprocess.Popen(['zcat', options.geno], stdout=subprocess.PIPE)
+    p2 = subprocess.Popen(['head', '-1'], stdin=p1.stdout, stdout=subprocess.PIPE)
+    
+    out, err = p2.communicate()
+    out = out.strip()
+    nhaps = len(out)
+    #min_cutoff = int(round(0.01*nhaps))
+    #max_cutoff = int(round(0.99*nhaps))
+    
+    # Avoid single-individual clades in case there's 1 highly divergent genome
+    min_cutoff = 3
+    # Avoid everybody but single-individual clades in case there's 1 highly divergent
+    # genome
+    max_cutoff = nhaps-3
+    
     devnull = open(os.devnull, 'w')
     
     for winsize in range(options.min, options.max, options.step):
@@ -41,7 +57,8 @@ def main(args):
             stdout=subprocess.PIPE, stderr=devnull)
         p2 = subprocess.Popen(['{}/bin/haplens'.format(sarge_root), '-o', '-', \
             '-p', str(winsize)], stdin=p1.stdout, stdout=subprocess.PIPE, stderr=devnull)
-        p3 = subprocess.Popen(['{}/bin/dump_haplens'.format(sarge_root)], stdin=p2.stdout,\
+        p3 = subprocess.Popen(['{}/bin/dump_haplens'.format(sarge_root), '-s', str(min_cutoff), \
+            '-S', str(max_cutoff)], stdin=p2.stdout,\
             stdout=subprocess.PIPE, stderr=devnull)
         p4 = subprocess.Popen(['head', '-2000'], stdin=p3.stdout, stdout=subprocess.PIPE)
         p5 = subprocess.Popen(['tail', '-1000'], stdin=p4.stdout, stdout=subprocess.PIPE)
