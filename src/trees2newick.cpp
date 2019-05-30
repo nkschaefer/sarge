@@ -52,8 +52,45 @@ void print_persistence(treeNode* tree, bool use_hapnames,
     }
 }
 
+bool print_der_allele(treeNode* tree, bool use_hapnames, vector<string>& hapnames, int site){
+    if (tree->mutations.find((long int) site) != tree->mutations.end()){
+        // Has site.
+        string clade_text = "";
+        set<unsigned int> leaves_set = bitset2set(tree->subtree_leaves(), tree->num_haps);
+        int i = 0;
+        for (set<unsigned int>::iterator li = leaves_set.begin(); li != leaves_set.end();
+            ++li){
+            if (use_hapnames){
+                clade_text += hapnames[*li];
+            }
+            else{
+                char intstr[10];
+                sprintf(intstr, "%d", *li);
+                string intstr2 = intstr;
+                clade_text += intstr;
+            }
+            if (i < leaves_set.size()-1){
+                clade_text += ",";
+            }
+            ++i;
+        }
+        fprintf(stdout, "\t%s", clade_text.c_str());
+        return true;
+    }
+    else{
+        for (vector<treeNode*>::iterator child = tree->children.begin();
+            child != tree->children.end(); ++child){
+            bool has_site = print_der_allele(*child, use_hapnames, hapnames, site);
+            if (has_site){
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 void print_site(treeNode& tree, string chrom, long int pos, bool use_hapnames, 
-    vector<string>& hapnames, bool recomb, bool metadata){
+    vector<string>& hapnames, bool recomb, bool metadata, int site){
     //float treedepth = tree.branchlens2percent();
     //float treedepth = 0;
     fprintf(stdout, "%s\t%ld\t%s", chrom.c_str(), pos, tree.newick(recomb, use_hapnames, hapnames).c_str());    
@@ -70,6 +107,13 @@ void print_site(treeNode& tree, string chrom, long int pos, bool use_hapnames,
             }
             ++i;
         } 
+    }
+    if (site != -1){
+        if (!metadata){
+            // Print blank field to keep view_trees.py parser happy
+            fprintf(stdout, "\t");
+        }
+        print_der_allele(&tree, use_hapnames, hapnames, site);
     }
     fprintf(stdout, "\n");
 }
@@ -144,7 +188,8 @@ remove any haplotypes that are direct leaves of the root\n");
 input file at a time\n");
     fprintf(stderr, "   --flatten_root -f (OPTIONAL) specify to change root branch length to \
 0, in case there is a long root that prevents you from being able to see the other clades\n");
-    fprintf(stderr, "   --site -S (OPTIONAL) a site position to create a FigTree annotation file for\n");
+    fprintf(stderr, "   --site -S (OPTIONAL) a site position for which to highlight all individuals \
+with the derived allele\n");
     fprintf(stderr, "   --outfile -o (OPTIONAL) with -s option, the name of the file to print \
 the FigTree annotation information in.\n");
     fprintf(stderr, "   --remove_branchlengths -B take all branch lengths out of output trees\n");
@@ -247,7 +292,8 @@ int main(int argc, char *argv[]) {
                 help(0);
         }    
     }
-
+    
+    /*
     FILE* outsitefile = NULL;
     if (site != -1){
         if (outfile.length() == 0){
@@ -263,6 +309,7 @@ the FigTree annotation information.\n");
             }
         }
     }
+    */
     
     if (indvs_given){
         parse_indvs(hapnames, indvfilename);
@@ -335,7 +382,7 @@ if you want to annotate nodes.\n");
         if (has_alleles){
             insert_alleles(&tree, alleles);
         }
-        
+        /*
         if (site != -1 && pos == site){
             // Create FigTree annotation data for this site.
             fprintf(outsitefile, "taxa\tsite_%d\n", site);
@@ -360,11 +407,14 @@ if you want to annotate nodes.\n");
                 }
             }
         }
-        print_site(tree, chrom, pos, indvs_given, hapnames, false, metadata);
+        */
+        print_site(tree, chrom, pos, indvs_given, hapnames, false, metadata, site);
 
     }
     
+    /*
     if (outsitefile != NULL){
         fclose(outsitefile);
     }
+    */
 }

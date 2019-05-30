@@ -30,6 +30,7 @@ class treeNode{
         
         // Branch length (over entire node range within propagation distance)
         float dist2;
+    
         
         // Branch length measured in leaving group counts (over entire node range within propagation distance)
         float dist_lv;
@@ -129,13 +130,13 @@ class treeNode{
         
         treeNode* get_smallest_containing(const cladeset&);
         //void get_smallest_containing(treeNode*&, cladeset&);
-        treeNode* get_clade_match(cladeset&);
-        bool has_clade_invalidates(cladeset&);
+        treeNode* get_clade_match(const cladeset&);
+        bool has_clade_invalidates(const cladeset&);
         
-        bool get_clades_invalidating(cladeset&,
+        bool get_clades_invalidating(const cladeset&,
             std::vector<cladeset >&);
             
-        bool get_clade_invalidates(cladeset&, 
+        bool get_clade_invalidates(const cladeset&, 
             std::vector<cladeset >&);
         
         void to_dist_map(float, std::map<float, std::vector<treeNode*> >&);

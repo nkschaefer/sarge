@@ -105,29 +105,46 @@ IDs to hexadecimal color codes.", file=sys.stderr)
         if len(data) > 3:
             # Parse metadata in 4th field.
             meta = data[3].split(';')
-            max_pers = -1
-            clades_pers = []
-            for elt in meta:
-                leaves, persistence = elt.split(':')
-                persistence = int(persistence)
-                leaves_arr = leaves.split(',')
-                
+            if meta[0] != "":
+                max_pers = -1
+                clades_pers = []
+                for elt in meta:
+                    leaves, persistence = elt.split(':')
+                    persistence = int(persistence)
+                    leaves_arr = leaves.split(',')
+                    
+                    if (len(leaves_arr) > 1):
+                        if persistence > max_pers:
+                            max_pers = persistence
+                        clades_pers.append((leaves_arr, persistence))
+                        
+                for tup in clades_pers:
+                    node = tree.get_common_ancestor(tup[0])
+                    # Add persistence value to node.
+                    ns = NodeStyle()
+                    ns['size'] = int(round((tup[1]/max_pers)*40))
+                    col_rgb = grad(tup[1]/max_pers)
+                    ns['fgcolor'] = rgb2hex(col_rgb)
+                    #ns['fgcolor'] = '#A8CFEA'
+                    node.set_style(ns)
+                    node.add_face(TextFace(str(tup[1]), fsize=15), column=0, position="branch-right")
+            
+            if len(data) > 4:
+                der_allele = data[4]
+                leaves_arr = der_allele.split(',')
                 if (len(leaves_arr) > 1):
-                    if persistence > max_pers:
-                        max_pers = persistence
-                    clades_pers.append((leaves_arr, persistence))
-                    
-            for tup in clades_pers:
-                node = tree.get_common_ancestor(tup[0])
-                # Add persistence value to node.
-                ns = NodeStyle()
-                ns['size'] = int(round((tup[1]/max_pers)*40))
-                col_rgb = grad(tup[1]/max_pers)
-                ns['fgcolor'] = rgb2hex(col_rgb)
-                #ns['fgcolor'] = '#A8CFEA'
-                node.set_style(ns)
-                node.add_face(TextFace(str(tup[1]), fsize=15), column=0, position="branch-right")
-                    
+                    node = tree.get_common_ancestor(leaves_arr)
+                    style = NodeStyle()
+                    style['fgcolor'] = "#0f0f0f"
+                    style['size'] = 0
+                    style['vt_line_color'] = '#ff0000'
+                    style['hz_line_color'] = '#ff0000'
+                    style['vt_line_width'] = 8
+                    style['hz_line_width'] = 8
+                    style['vt_line_type'] = 0
+                    style['hz_line_type'] = 0
+                    node.set_style(style)
+                
         ts = TreeStyle()
         ts.mode = 'c'      
         # Hide normal leaf names if we're showing population colors - it'll be

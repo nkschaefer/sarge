@@ -511,6 +511,55 @@ void parse_pops(map<string, string>& indv2pop, map<string, vector<string> >& pop
     }
 }
 
+/**
+ * Parses a file mapping haplotype names to branch shortening values
+ */
+void parse_brshorten(unordered_map<cladeset, float>& brshorten_vals,
+    vector<string>& indvs, string& filename, int num_haplotypes){
+    fstream fin;
+    fin.open(filename.c_str(), fstream::in);
+    if (!fin.good()){
+        fprintf(stderr, "ERROR opening file %s\n", filename.c_str());
+        exit(1);
+    }
+    string line;
+    while (!fin.eof()){
+        std::getline(fin, line);
+        if (line.compare("") != 0){
+            istringstream tabsplitter(line);
+            string field;
+            int field_index = 0;
+            
+            string hapname;
+            float brshorten;
+            
+            while(std::getline(tabsplitter, field, '\t')){
+                if (field_index == 0){
+                    hapname = field;
+                }
+                else if (field_index == 1){
+                    brshorten = atof(field.c_str());
+                }
+                field_index++;
+            }
+            // Translate haplotype name into a cladeset
+            int hap_ind = -1;
+            for (int i = 0; i < indvs.size(); ++i){
+                if (indvs[i] == hapname){
+                    hap_ind = i;
+                    break;
+                }
+            }
+            if (hap_ind != -1){
+                set<unsigned int> bs;
+                bs.insert(hap_ind);
+                cladeset cs = set2bitset(bs, num_haplotypes);
+                brshorten_vals.insert(make_pair(cs, brshorten));
+            }
+        }
+    }
+}
+
 
 /**
  * Given a file containing indices of samples haplotypes (one per line), loads it

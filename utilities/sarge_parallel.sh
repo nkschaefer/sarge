@@ -83,6 +83,7 @@ for fnbase in $(find $dir -type f -name "*_split_${propdist}*.sarge.gz" -printf 
     filescat=$(find "${dir}" -mindepth 1 -maxdepth 1 -type f -name "${fnbase}_split_${propdist}*.sarge.gz" | sort -V)
     >&2 echo $filescat
     zcat $filescat | gzip -c - > "${dir}/${fnbase}_joined_${propdist}.sarge.gz"
+    find "${dir}" -mindepth 1 -maxdepth 1 -type f -name "${fnbase}_split_${propdist}*.sarge.gz" -delete
     echo "${sarge_dir}/bin/index ${dir}/${fnbase}_joined_${propdist}.sarge.gz" >> "${dir}/sarge_index.jobs"
 done
 

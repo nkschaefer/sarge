@@ -113,6 +113,9 @@ void parse_indvs_map(std::map<std::string, int>&, std::string);
 // Parse a file mapping individual IDs to population IDs
 void parse_pops(std::map<std::string, std::string>&, std::map<std::string, std::vector<std::string> >&, std::string, int ploidy);
 
+// Parse a file mapping haplotype names to branch shortening vals
+void parse_brshorten(std::unordered_map<cladeset, float>&, std::vector<std::string>&, std::string&, int);
+
 // Parse a file containing indices of sampled haplotypes and store as a 
 // bitset mask
 void load_hap_sample(std::string, cladeset&, int);

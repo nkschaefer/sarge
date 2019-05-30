@@ -27,7 +27,7 @@ using std::endl;
 using namespace std;
 
 // How many bases do we need to go before writing an index entry?
-int pos_step = 100000;
+int pos_step = 5000;
     
 inline void write_indexdata(FILE* out, 
     bool haschrom, string& chrom, long int& pos, std::streampos strpos,

@@ -21,7 +21,7 @@ OPTS += -stdlib=libc++
 endif
 CCOMP = gcc
 
-all: bin/sarge bin/trees2newick bin/index bin/index_geno bin/ms_tree_site bin/admix_scan bin/tmrcas_scan bin/dstat bin/upgma bin/vcf2sarge bin/vcf_depths bin/cpg_bed bin/ms2sarge bin/haplens bin/dump_haplens
+all: bin/sarge bin/trees2newick bin/index bin/index_geno bin/ms_tree_site bin/admix_scan bin/tmrcas_scan bin/dstat bin/upgma bin/vcf2sarge bin/vcf_depths bin/cpg_bed bin/ms2sarge bin/haplens bin/dump_haplens bin/bait_scan bin/rth bin/rel_ils
 
 bin/sarge: src/main.cpp $(OBJDEPS)
 	$(COMP) -std=c++11 $(OPTS) -g src/main.cpp -o bin/sarge $(OBJDEPS) -lz 
@@ -40,6 +40,15 @@ bin/ms_tree_site: src/ms_tree_site.cpp src/common.cpp $(OBJDEPS) src/common.h
 
 bin/admix_scan: src/admix_scan.cpp $(OBJDEPS)
 	$(COMP) -std=c++11 $(OPTS) src/admix_scan.cpp -o bin/admix_scan $(OBJDEPS) -lz
+
+bin/bait_scan: src/bait_scan.cpp $(OBJDEPS)
+	$(COMP) -std=c++11 $(OPTS) src/bait_scan.cpp -o bin/bait_scan $(OBJDEPS) -lz
+
+bin/rth: src/rth.cpp $(OBJDEPS)
+	$(COMP) -std=c++11 $(OPTS) src/rth.cpp -o bin/rth $(OBJDEPS) -lz
+
+bin/rel_ils: src/rel_ils.cpp $(OBJDEPS)
+	$(COMP) -std=c++11 $(OPTS) src/rel_ils.cpp -o bin/rel_ils $(OBJDEPS) -lz
 
 bin/tmrcas_scan: src/tmrcas_scan.cpp $(OBJDEPS)
 	$(COMP) -std=c++11 $(OPTS) src/tmrcas_scan.cpp -o bin/tmrcas_scan $(OBJDEPS) -lz

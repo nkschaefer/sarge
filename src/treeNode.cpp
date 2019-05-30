@@ -870,7 +870,7 @@ treeNode* treeNode::get_smallest_containing(const cladeset& clade){
  * Given a set of leaves, goes through this treeNode's subtree to look for a clade
  * whose subtree exactly matches the set of leaves. Returns NULL on failure.
  */
-treeNode* treeNode::get_clade_match(cladeset& clade){
+treeNode* treeNode::get_clade_match(const cladeset& clade){
     for (vector<treeNode*>::iterator child = this->children.begin(); child != this->children.end();
         ++child){
         cladeset child_subtree = (*child)->subtree_leaves();
@@ -894,7 +894,7 @@ treeNode* treeNode::get_clade_match(cladeset& clade){
  * that groups some of the clade of interest's members with nonmembers 
  * (invalidates the clade). Returns true if so, or false if not.
  */
-bool treeNode::has_clade_invalidates(cladeset& clade){
+bool treeNode::has_clade_invalidates(const cladeset& clade){
     cladeset this_subtree = this->subtree_leaves();
     if (!issubset_bitset(this_subtree, clade) && !issuperset_bitset(this_subtree, clade) &&
         set_int_bitset(this_subtree, clade).count() > 0){
@@ -912,7 +912,7 @@ bool treeNode::has_clade_invalidates(cladeset& clade){
 /**
  * Gets the lowest-level clades in the tree that invalidate a propagating clade.
  */
-bool treeNode::get_clade_invalidates(cladeset& clade,
+bool treeNode::get_clade_invalidates(const cladeset& clade,
     vector<cladeset >& invalidates){
     
     bool child_invalidates = false;
@@ -946,7 +946,7 @@ bool treeNode::get_clade_invalidates(cladeset& clade,
     return child_invalidates;
 }
 
-bool treeNode::get_clades_invalidating(cladeset& clade,
+bool treeNode::get_clades_invalidating(const cladeset& clade,
     vector<cladeset >& invalidates){
     // Goal: get every highest-level invalidating clade in the tree
     cladeset this_subtree = this->subtree_leaves();
@@ -973,7 +973,8 @@ bool treeNode::get_clades_invalidating(cladeset& clade,
  * recursively into the data structure.
  */
 void treeNode::to_dist_map(float dist_from_root, std::map<float, vector<treeNode*> >& nodes){
-    float this_dist_from_root = this->dist + dist_from_root;
+    float this_dist_from_root = this->dist_below/(this->dist_above+this->dist_below);
+    //float this_dist_from_root = this->dist + dist_from_root;
    
         if (nodes.count(this_dist_from_root) == 0){
             // Need to create a new empty vector for this distance from the root.
