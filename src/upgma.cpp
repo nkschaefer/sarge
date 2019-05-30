@@ -251,19 +251,7 @@ long int count_lines(const char* filename, long int bufsize){
     return numlines;
 }
 
-void unnorm_branchlens(treeNode* node){
-    node->dist_norm = node->dist;
-    for (vector<treeNode*>::iterator c = node->children.begin(); c != node->children.end(); ++c){
-        unnorm_branchlens((*c));
-    }
-}
 
-void norm_brlens(treeNode* tree, float denom){
-    tree->dist_norm = tree->dist_norm / denom;
-    for (vector<treeNode*>::iterator c = tree->children.begin(); c != tree->children.end(); ++c){
-        norm_brlens(*c, denom);
-    }
-}
 
 int main(int argc, char *argv[]) {    
     // Define arguments 

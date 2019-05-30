@@ -560,6 +560,19 @@ void parse_brshorten(unordered_map<cladeset, float>& brshorten_vals,
     }
 }
 
+void unnorm_branchlens(treeNode* node){
+    node->dist_norm = node->dist;
+    for (vector<treeNode*>::iterator c = node->children.begin(); c != node->children.end(); ++c){
+        unnorm_branchlens((*c));
+    }
+}
+
+void norm_brlens(treeNode* tree, float denom){
+    tree->dist_norm = tree->dist_norm / denom;
+    for (vector<treeNode*>::iterator c = tree->children.begin(); c != tree->children.end(); ++c){
+        norm_brlens(*c, denom);
+    }
+}
 
 /**
  * Given a file containing indices of samples haplotypes (one per line), loads it

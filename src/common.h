@@ -116,6 +116,9 @@ void parse_pops(std::map<std::string, std::string>&, std::map<std::string, std::
 // Parse a file mapping haplotype names to branch shortening vals
 void parse_brshorten(std::unordered_map<cladeset, float>&, std::vector<std::string>&, std::string&, int);
 
+void unnorm_branchlens(treeNode*);
+void norm_brlens(treeNode*, float);
+
 // Parse a file containing indices of sampled haplotypes and store as a 
 // bitset mask
 void load_hap_sample(std::string, cladeset&, int);

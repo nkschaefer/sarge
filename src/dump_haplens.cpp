@@ -26,14 +26,16 @@ struct haplen_dat{
     float tmrca;
     float tmrca_p;
     bool selected_haps;
+    float tmrca_avgtree;
     
-    haplen_dat(int ti, long int s, float pers, float t, float p, bool sh){
+    haplen_dat(int ti, long int s, float pers, float t, float p, bool sh, float ta){
         this->traversal_index = ti;
         this->size = s;
         this->persistence = pers;
         this->tmrca = t;
         this->tmrca_p = p;
         this->selected_haps = sh;
+        this->tmrca_avgtree = ta;
     };
 };
 
@@ -61,7 +63,9 @@ void compile_haplens(treeNode* tree,
     map<pair<long double, long double>, vector<long double> >& ages_freqs,  
     bool use_selected_haps, 
     cladeset& selected_haps,
-    vector<haplen_dat>& haps){
+    vector<haplen_dat>& haps,
+    bool use_avg_tree,
+    treeNode* avg_tree){
     
     if (tree->parent != NULL && tree->persistence > 0){
         cladeset st = tree->subtree_leaves();
@@ -101,8 +105,17 @@ void compile_haplens(treeNode* tree,
                                         has_selected_haps = false;
                                     }
                                 }
+                                
+                                // Find TMRCA of clade in average tree
+                                float tmrca_avg = -1;
+                                if (use_avg_tree){
+                                    cladeset st = tree->subtree_leaves();
+                                    treeNode* n_avg = avg_tree->get_smallest_containing(st);
+                                    tmrca_avg = n_avg->dist_below/(n_avg->dist_below+n_avg->dist_above);
+                                }
+                                
                                 haps.push_back(haplen_dat(traversal_index, st.count(), 
-                                    tree->persistence, tmrca, probsum, has_selected_haps));
+                                    tree->persistence, tmrca, probsum, has_selected_haps, tmrca_avg));
                                 //fprintf(stdout, "%s\t%ld\t%d\t%ld\t%ld\t%Lf\t%f\n", chrom.c_str(), pos,
                                 //    traversal_index, st.count(), tree->persistence, tmrca, probsum);
                             }
@@ -131,8 +144,16 @@ void compile_haplens(treeNode* tree,
                             has_selected_haps = false;
                         }
                     }
+                    // Find TMRCA of clade in average tree
+                    float tmrca_avg = -1;
+                    if (use_avg_tree){
+                        cladeset st = tree->subtree_leaves();
+                        treeNode* n_avg = avg_tree->get_smallest_containing(st);
+                        tmrca_avg = n_avg->dist_below/(n_avg->dist_below+n_avg->dist_above);
+                    }
+                    
                     haps.push_back(haplen_dat(traversal_index, st.count(),
-                        tree->persistence, tmrca, -1, has_selected_haps));
+                        tree->persistence, tmrca, -1, has_selected_haps, tmrca_avg));
                 }
             }
         }
@@ -141,7 +162,7 @@ void compile_haplens(treeNode* tree,
     for (vector<treeNode*>::iterator child = tree->children.begin(); child !=
         tree->children.end(); ++child){
         compile_haplens(*child, traversal_index, freqs_given, 
-            ages_freqs, use_selected_haps, selected_haps, haps);
+            ages_freqs, use_selected_haps, selected_haps, haps, use_avg_tree, avg_tree);
     }
 }
 
@@ -153,7 +174,8 @@ void print_haplens(vector<haplen_dat>& haps,
     long int maxsize, 
     long int minlen, 
     float p_cutoff,
-    float tmrca_cutoff){
+    float tmrca_cutoff,
+    bool use_avg_tree){
     
     // Map traversal index to rank percentile (two different ways)
     map<int, float> rank_persistence;
@@ -193,6 +215,9 @@ void print_haplens(vector<haplen_dat>& haps,
                 float p_tmrca = 1-exp(-1.0/tmrca_p_mean*hap->tmrca_p);
                 fprintf(stdout, "\t%f\t%f", p_tmrca,
                     p_persistence*p_tmrca);
+            }
+            if (use_avg_tree){
+                fprintf(stdout, "\t%f", hap->tmrca_avgtree);
             }
             fprintf(stdout, "\n");
         }
@@ -348,6 +373,9 @@ required if using -i and -v options\n");
     fprintf(stderr, "   --include -i (OPTIONAL) require clades to include haplotypes \
 from a population given in the --pops file. Requires -p and -v options; may specify more than \
 once (use -i before each population name).\n");
+    fprintf(stderr, "   --tree -T (OPTIONAL) if you run upgma on the entire chromosome, \
+you can provide the resulting tree as a parameter here, and each printed clade will \
+list its TMRCA in the average tree. Higher TMRCA means more unusual grouping of haplotypes.\n");
     exit(code);
 }
 
@@ -364,6 +392,7 @@ int main(int argc, char *argv[]) {
        {"indvs", required_argument, 0, 'v'},
        {"pops", required_argument, 0, 'p'},
        {"include", required_argument, 0, 'i'},
+       {"tree", required_argument, 0, 'T'},
        {0, 0, 0, 0} 
     };
     
@@ -381,6 +410,8 @@ int main(int argc, char *argv[]) {
     string popsfile;
     bool popsfile_given = false;
     vector<string> include_pops;
+    string treefilename;
+    bool treefile_given = false;
     
     int ch;
     /*
@@ -388,7 +419,7 @@ int main(int argc, char *argv[]) {
         help(0);
     }
     */
-    while((ch = getopt_long(argc, argv, "b:s:S:l:f:P:t:v:p:i:h", long_options, &option_index )) != -1){
+    while((ch = getopt_long(argc, argv, "b:s:S:l:f:P:t:v:p:i:T:h", long_options, &option_index )) != -1){
         switch(ch){
             case 0:
                 // This option set a flag. No need to do anything here.
@@ -425,6 +456,10 @@ int main(int argc, char *argv[]) {
                 break;
             case 'i':
                 include_pops.push_back((string)optarg);
+                break;
+            case 'T':
+                treefilename = optarg;
+                treefile_given = true;
                 break;
             case '?':
                 //help(0);
@@ -491,6 +526,27 @@ not specified the haplotype/population mapping file -p.\n");
         fprintf(stderr, "ERROR: maximum clade size must be <= %d\n", num_haplotypes-1);
         exit(1);
     }
+    
+    treeNode* avg_tree;
+    
+    if (treefile_given){
+        // Load tree from file.
+        gzFile treefile;
+        treefile = gzopen(treefilename.c_str(), "rb");
+        if (!treefile){
+            fprintf(stderr, "ERROR opening file %s for reading.\n", treefilename.c_str());
+            exit(1);
+        }
+        instream_info is;
+        instream_init(is, &treefile, bufsize);
+        read_header(is, num_haplotypes, mask);
+        avg_tree = new treeNode();
+        
+        unserialize_treeNode(*avg_tree, num_haplotypes, is);
+        avg_tree->setRoot();
+        unnorm_branchlens(avg_tree);
+    }
+    
     vector<string> haps;
     map<string, int> str2hap;
     if (hapsfile_given){
@@ -563,9 +619,9 @@ not specified the haplotype/population mapping file -p.\n");
         int ti = 0;
         vector<haplen_dat> haps;
         compile_haplens(tree, ti, freqs_given, ages_freqs, use_selected_haps,
-            selected_haps, haps);
+            selected_haps, haps, treefile_given, avg_tree);
         print_haplens(haps, chrom, pos, freqs_given, minsize, maxsize, minlen,
-            p_cutoff, tmrca_cutoff);
+            p_cutoff, tmrca_cutoff, treefile_given);
         delete tree;
     }
     
