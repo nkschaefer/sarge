@@ -21,14 +21,15 @@ using namespace std;
 // Store information about an individual clade
 struct haplen_dat{
     int traversal_index;
-    long int size;
+    float size;
     long int persistence;
     float tmrca;
     float tmrca_p;
     bool selected_haps;
     float tmrca_avgtree;
+    set<long int> sites;
     
-    haplen_dat(int ti, long int s, float pers, float t, float p, bool sh, float ta){
+    haplen_dat(int ti, float s, float pers, float t, float p, bool sh, float ta){
         this->traversal_index = ti;
         this->size = s;
         this->persistence = pers;
@@ -36,6 +37,7 @@ struct haplen_dat{
         this->tmrca_p = p;
         this->selected_haps = sh;
         this->tmrca_avgtree = ta;
+        this->sites.clear();
     };
 };
 
@@ -65,7 +67,8 @@ void compile_haplens(treeNode* tree,
     cladeset& selected_haps,
     vector<haplen_dat>& haps,
     bool use_avg_tree,
-    treeNode* avg_tree){
+    treeNode* avg_tree,
+    int num_haplotypes){
     
     if (tree->parent != NULL && tree->persistence > 0){
         cladeset st = tree->subtree_leaves();
@@ -114,8 +117,14 @@ void compile_haplens(treeNode* tree,
                                     tmrca_avg = n_avg->dist_below/(n_avg->dist_below+n_avg->dist_above);
                                 }
                                 
-                                haps.push_back(haplen_dat(traversal_index, st.count(), 
+                                haps.push_back(haplen_dat(traversal_index, (float)st.count()/(float)num_haplotypes, 
                                     tree->persistence, tmrca, probsum, has_selected_haps, tmrca_avg));
+                                
+                                for (set<long int>::iterator site = 
+                                    tree->mutations.begin(); site != tree->mutations.end();
+                                    ++site){
+                                    haps.rbegin()->sites.insert(*site);
+                                }
                                 //fprintf(stdout, "%s\t%ld\t%d\t%ld\t%ld\t%Lf\t%f\n", chrom.c_str(), pos,
                                 //    traversal_index, st.count(), tree->persistence, tmrca, probsum);
                             }
@@ -152,8 +161,13 @@ void compile_haplens(treeNode* tree,
                         tmrca_avg = n_avg->dist_below/(n_avg->dist_below+n_avg->dist_above);
                     }
                     
-                    haps.push_back(haplen_dat(traversal_index, st.count(),
+                    haps.push_back(haplen_dat(traversal_index, (float)st.count()/(float)num_haplotypes,
                         tree->persistence, tmrca, -1, has_selected_haps, tmrca_avg));
+                    
+                    for (set<long int>::iterator site = tree->mutations.begin();
+                        site != tree->mutations.end(); ++site){
+                        haps.rbegin()->sites.insert(*site);
+                    }
                 }
             }
         }
@@ -162,7 +176,7 @@ void compile_haplens(treeNode* tree,
     for (vector<treeNode*>::iterator child = tree->children.begin(); child !=
         tree->children.end(); ++child){
         compile_haplens(*child, traversal_index, freqs_given, 
-            ages_freqs, use_selected_haps, selected_haps, haps, use_avg_tree, avg_tree);
+            ages_freqs, use_selected_haps, selected_haps, haps, use_avg_tree, avg_tree, num_haplotypes);
     }
 }
 
@@ -170,8 +184,8 @@ void print_haplens(vector<haplen_dat>& haps,
     string& chrom, 
     long int pos, 
     bool freqs_given,
-    long int minsize, 
-    long int maxsize, 
+    float minsize, 
+    float maxsize, 
     long int minlen, 
     float p_cutoff,
     float tmrca_cutoff,
@@ -204,8 +218,24 @@ void print_haplens(vector<haplen_dat>& haps,
             (maxsize == -1 || hap->size <= maxsize) && 
             hap->persistence >= minlen &&
             (!freqs_given || hap->tmrca_p <= p_cutoff)){
-            fprintf(stdout, "%s\t%ld\t%d\t%ld\t%ld\t%f", chrom.c_str(), pos, hap->traversal_index,
-                hap->size, hap->persistence, hap->tmrca);
+            
+            string sitestr = "";
+            for (set<long int>::iterator site = hap->sites.begin();
+                site != hap->sites.end(); ++site){
+                char buf[10];
+                sprintf(buf, "%ld", *site);
+                string bufstr = buf;
+                sitestr += bufstr + ",";
+            }
+            if (sitestr.length() == 0){
+                sitestr = "NA";
+            }
+            else{
+                sitestr = sitestr.substr(0, sitestr.length()-1);
+            }
+            
+            fprintf(stdout, "%s\t%ld\t%s\t%d\t%f\t%ld\t%f", chrom.c_str(), pos, sitestr.c_str(),
+                hap->traversal_index, hap->size, hap->persistence, hap->tmrca);
             if (freqs_given){
                 fprintf(stdout, "\t%f", hap->tmrca_p);
             } 
@@ -231,7 +261,7 @@ void print_haplens(vector<haplen_dat>& haps,
     count++;
     if (count == 1000){
     for (vector<haplen_dat>::iterator h = haps.begin(); h != haps.end(); ++h){
-        fprintf(stderr, "%f\t%ld\t%ld\n", h->tmrca, h->size, h->persistence);   
+        fprintf(stderr, "%f\t%f\t%ld\n", h->tmrca, h->size, h->persistence);   
     }
     exit(1);
     }
@@ -280,7 +310,23 @@ void print_haplens(vector<haplen_dat>& haps,
             (maxsize == -1 || hap->size <= maxsize) && 
             hap->persistence >= minlen &&
             (!freqs_given || hap->tmrca_p <= p_cutoff)){
-            fprintf(stdout, "%s\t%ld\t%d\t%ld\t%ld\t%f", chrom.c_str(), pos, hap->traversal_index,
+            
+            string sitestr = "";
+            for (set<long int>::iterator site = hap->sites.begin();
+                site != hap->sites.end(); ++site){
+                char buf[10];
+                sprintf(buf, "%ld", *site);
+                string bufstr = buf;
+                sitestr += bufstr + ",";
+            }
+            if (sitestr.length() == 0){
+                sitestr = "NA";
+            }
+            else{
+                sitestr = sitestr.substr(0, sitestr.length()-1);
+            }
+            fprintf(stdout, "%s\t%ld\t%s\t%d\t%f\t%ld\t%f", chrom.c_str(), pos, 
+                sitestr.c_str(), hap->traversal_index,
                 hap->size, hap->persistence, hap->tmrca);
             if (freqs_given){
                 fprintf(stdout, "\t%f", hap->tmrca_p);
@@ -520,11 +566,21 @@ not specified the haplotype/population mapping file -p.\n");
     cladeset mask;
     read_header(is, num_haplotypes, mask);
     
+    
     fprintf(stderr, "Read %d haplotypes\n", num_haplotypes);
     
     if (maxsize != -1 && maxsize > num_haplotypes-1){
         fprintf(stderr, "ERROR: maximum clade size must be <= %d\n", num_haplotypes-1);
         exit(1);
+    }
+    
+    float maxsize_float = -1;
+    float minsize_float = -1;
+    if (minsize != -1){
+        minsize_float = (float)minsize/(float)num_haplotypes;
+    }
+    if (maxsize != -1){
+        maxsize_float = (float)maxsize/(float)num_haplotypes;
     }
     
     treeNode* avg_tree;
@@ -600,13 +656,16 @@ not specified the haplotype/population mapping file -p.\n");
     long int last_printed = 0;
     long int progress = 5000;
     
-    fprintf(stdout, "#chrom\tpos\ttrav_index\thaps\tpersistence\ttmrca");
+    fprintf(stdout, "#chrom\tpos\tsites\ttrav_index\thaps\tpersistence\ttmrca");
     if (freqs_given){
         fprintf(stdout, "\tp");
     }
     fprintf(stdout, "\trank_pers");
     if (freqs_given){
         fprintf(stdout, "\trank_tmrca_p\tcombined_p");
+    }
+    if (treefile_given){
+        fprintf(stdout, "\tavg_tree_tmrca");
     }
     fprintf(stdout, "\n");
     
@@ -619,8 +678,9 @@ not specified the haplotype/population mapping file -p.\n");
         int ti = 0;
         vector<haplen_dat> haps;
         compile_haplens(tree, ti, freqs_given, ages_freqs, use_selected_haps,
-            selected_haps, haps, treefile_given, avg_tree);
-        print_haplens(haps, chrom, pos, freqs_given, minsize, maxsize, minlen,
+            selected_haps, haps, treefile_given, avg_tree, num_haplotypes);
+        print_haplens(haps, chrom, pos, freqs_given, minsize_float, 
+            maxsize_float, minlen,
             p_cutoff, tmrca_cutoff, treefile_given);
         delete tree;
     }
