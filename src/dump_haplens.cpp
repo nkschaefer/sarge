@@ -64,7 +64,9 @@ void compile_haplens(treeNode* tree,
     bool freqs_given,
     map<pair<long double, long double>, vector<long double> >& ages_freqs,  
     bool use_selected_haps, 
-    cladeset& selected_haps,
+    const cladeset& selected_haps,
+    bool use_excl_haps,
+    const cladeset& excl_haps,
     vector<haplen_dat>& haps,
     bool use_avg_tree,
     treeNode* avg_tree,
@@ -105,6 +107,12 @@ void compile_haplens(treeNode* tree,
                                         has_selected_haps = true;
                                     }
                                     else{
+                                        has_selected_haps = false;
+                                    }
+                                }
+                                // Apply exclude haplotypes filter if applicable
+                                if (has_selected_haps && use_excl_haps){
+                                    if ((st & excl_haps).count() > 0){
                                         has_selected_haps = false;
                                     }
                                 }
@@ -176,7 +184,8 @@ void compile_haplens(treeNode* tree,
     for (vector<treeNode*>::iterator child = tree->children.begin(); child !=
         tree->children.end(); ++child){
         compile_haplens(*child, traversal_index, freqs_given, 
-            ages_freqs, use_selected_haps, selected_haps, haps, use_avg_tree, avg_tree, num_haplotypes);
+            ages_freqs, use_selected_haps, selected_haps, use_excl_haps, excl_haps,
+            haps, use_avg_tree, avg_tree, num_haplotypes);
     }
 }
 
@@ -419,6 +428,9 @@ required if using -i and -v options\n");
     fprintf(stderr, "   --include -i (OPTIONAL) require clades to include haplotypes \
 from a population given in the --pops file. Requires -p and -v options; may specify more than \
 once (use -i before each population name).\n");
+    fprintf(stderr, "   --exclude -e (OPTIONAL) require clades to exclude haplotypes \
+from a population given in the --pops file. Requires -p and -v options; may specify more than \
+once (use -i before each population name).\n");
     fprintf(stderr, "   --tree -T (OPTIONAL) if you run upgma on the entire chromosome, \
 you can provide the resulting tree as a parameter here, and each printed clade will \
 list its TMRCA in the average tree. Higher TMRCA means more unusual grouping of haplotypes.\n");
@@ -438,6 +450,7 @@ int main(int argc, char *argv[]) {
        {"indvs", required_argument, 0, 'v'},
        {"pops", required_argument, 0, 'p'},
        {"include", required_argument, 0, 'i'},
+       {"exclude", required_argument, 0, 'e'},
        {"tree", required_argument, 0, 'T'},
        {0, 0, 0, 0} 
     };
@@ -456,6 +469,7 @@ int main(int argc, char *argv[]) {
     string popsfile;
     bool popsfile_given = false;
     vector<string> include_pops;
+    vector<string> exclude_pops;
     string treefilename;
     bool treefile_given = false;
     
@@ -465,7 +479,7 @@ int main(int argc, char *argv[]) {
         help(0);
     }
     */
-    while((ch = getopt_long(argc, argv, "b:s:S:l:f:P:t:v:p:i:T:h", long_options, &option_index )) != -1){
+    while((ch = getopt_long(argc, argv, "b:s:S:l:f:P:t:v:p:i:e:T:h", long_options, &option_index )) != -1){
         switch(ch){
             case 0:
                 // This option set a flag. No need to do anything here.
@@ -502,6 +516,9 @@ int main(int argc, char *argv[]) {
                 break;
             case 'i':
                 include_pops.push_back((string)optarg);
+                break;
+            case 'e':
+                exclude_pops.push_back((string)optarg);
                 break;
             case 'T':
                 treefilename = optarg;
@@ -541,7 +558,12 @@ in target clades, but have not specified the haplotype names file -v and/or have
 not specified the haplotype/population mapping file -p.\n");
         exit(1);
     }
-    
+    if (exclude_pops.size() > 0 && (!hapsfile_given || !popsfile_given)){
+        fprintf(stderr, "ERROR: you have specified one or more populations to exclude \
+in target clades, but have not specified the haplotype names file -v and/or have \
+not specified the haplotype/population mapping file -p.\n");
+        exit(1);
+    }
     FILE *instream = stdin;
     if (instream == NULL){
         fprintf(stderr, "Error opening input stream\n");
@@ -635,8 +657,15 @@ not specified the haplotype/population mapping file -p.\n");
     set<unsigned int> selected_haps_set;
     cladeset selected_haps;
     bool use_selected_haps = false;
-    if (popsfile_given && hapsfile_given && include_pops.size() > 0){
+    set<unsigned int> excl_haps_set;
+    cladeset excl_haps;
+    bool use_excl_haps = false;
+    
+    if (popsfile_given){
         parse_pops(indv2pop, pop2indv, popsfile, ploidy);
+    }
+    
+    if (popsfile_given && hapsfile_given && include_pops.size() > 0){
         use_selected_haps = true;
         // Now translate the selected populations into a bitset of 
         // eligible haplotypes.
@@ -650,6 +679,18 @@ not specified the haplotype/population mapping file -p.\n");
             }   
         }
         selected_haps = set2bitset(selected_haps_set, num_haplotypes);
+    }
+    if (popsfile_given && hapsfile_given && exclude_pops.size() > 0){
+        use_excl_haps = true;
+        for (vector<string>::iterator pop = exclude_pops.begin();
+            pop != exclude_pops.end(); ++pop){
+            for (vector<string>::iterator hapname = pop2indv[*pop].begin();
+                hapname != pop2indv[*pop].end(); ++hapname){
+                int hapind = str2hap[*hapname];
+                excl_haps_set.insert((unsigned int)hapind);
+            }
+        }
+        excl_haps = set2bitset(excl_haps_set, num_haplotypes);
     }
     
     
@@ -678,7 +719,7 @@ not specified the haplotype/population mapping file -p.\n");
         int ti = 0;
         vector<haplen_dat> haps;
         compile_haplens(tree, ti, freqs_given, ages_freqs, use_selected_haps,
-            selected_haps, haps, treefile_given, avg_tree, num_haplotypes);
+            selected_haps, use_excl_haps, excl_haps, haps, treefile_given, avg_tree, num_haplotypes);
         print_haplens(haps, chrom, pos, freqs_given, minsize_float, 
             maxsize_float, minlen,
             p_cutoff, tmrca_cutoff, treefile_given);
