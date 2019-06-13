@@ -180,9 +180,12 @@ void compile_haplens(treeNode* tree,
             }
         }
     }
-    traversal_index++;
+    
     for (vector<treeNode*>::iterator child = tree->children.begin(); child !=
         tree->children.end(); ++child){
+        
+        traversal_index++;
+        
         compile_haplens(*child, traversal_index, freqs_given, 
             ages_freqs, use_selected_haps, selected_haps, use_excl_haps, excl_haps,
             haps, use_avg_tree, avg_tree, num_haplotypes);
