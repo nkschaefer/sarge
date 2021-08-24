@@ -105,6 +105,29 @@ Currently, SARGE is designed to expect only one chromosome per set of input file
 
 All programs should display a usage message if run with no arguments.
 
+## Utility Programs
 
+Some utility programs are provided for help with specific tasks. 
+
+*sarge_parallel.sh will split up a set of input files into chunks that can be run in parallel (dividing where there are large gaps in a sequence, such as centromeres). It will then run as much as possible in parallel and join output files together when finished.
+
+*view_trees.py can be used to look at individual trees (must select all trees (<code>zcat [output file]</code>) or a specific region (<code>bin/sarge_index [output file] chr3:5000000-10000000</code>) and pipe to <code>bin/trees2newick</code> and then to <code>utilities/view_trees.py</code>
+
+*run_relate.sh takes SARGE-format input files, converts to Relate format, runs Relate, and converts output to SARGE-format output files (requires Relate binaries, last tested with Relate v1.0.17)
+
+*run_tsinfer.sh takes SARGE-format input files, runs tsinfer and tsdate, and converts output to SARGE-format output files (requires tsinfer and tsdate to be installed in python in the current $PATH)
+
+*run_rentplus.sh takes SARGE-format intput files, converts to Rent+ format, runs Rent+, and converts output to SARGE-format output files (requires RentPlus.jar file)
+
+## Testing programs
+
+There are several programs for testing output by comparing to trees from an MS simulation (with the -T parameter enabled for outputting the simulation ARG). Each program takes uncompressed SARGE output format as stdin: i.e. <code> zcat testdata.sarge.gz | [program]</code>
+
+These programs are:
+
+*test/score_trees_ms to gauge accuracy of trees
+*test/ms_branch_compare to compare branch lengths on correct clades to those from the simulation
+*test/ms_corr_dist to determine, when a clade is incorrect, the distance to a position at which the clade would have been correctly inferred
+*test/ms_missing_clades to check the sizes (in number of leaf haplotypes) of true clades (from a simulation) that were not captured in inferred/output data
  
 
