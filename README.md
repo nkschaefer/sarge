@@ -113,11 +113,11 @@ Some utility programs are provided for help with specific tasks.
 
 *<code>utilities/view_trees.py</code> can be used to look at individual trees (must select all trees (<code>zcat [output file]</code>) or a specific region (<code>bin/sarge_index [output file] chr3:5000000-10000000</code>) and pipe to <code>bin/trees2newick</code> and then to <code>utilities/view_trees.py</code>
 
-*<code>utilities/run_relate.sh</code> takes SARGE-format input files, converts to Relate format, runs Relate, and converts output to SARGE-format output files (requires Relate binaries, last tested with Relate v1.0.17)
+*<code>utilities/run_relate.sh</code> takes SARGE-format input files, converts to [Relate](https://myersgroup.github.io/relate/) format, runs Relate, and converts output to SARGE-format output files (requires Relate binaries, last tested with Relate v1.0.17)
 
-*<code>utilities/run_tsinfer.sh</code> takes SARGE-format input files, runs tsinfer and tsdate, and converts output to SARGE-format output files (requires tsinfer and tsdate to be installed in python in the current $PATH)
+*<code>utilities/run_tsinfer.sh</code> takes SARGE-format input files, runs [tsinfer](https://tsinfer.readthedocs.io/en/latest/) and [tsdate](https://tsdate.readthedocs.io/en/latest/), and converts output to SARGE-format output files (requires tsinfer and tsdate to be installed in python in the current $PATH)
 
-*<code>utilities/run_rentplus.sh</code> takes SARGE-format intput files, converts to Rent+ format, runs Rent+, and converts output to SARGE-format output files (requires RentPlus.jar file)
+*<code>utilities/run_rentplus.sh</code> takes SARGE-format intput files, converts to Rent+ format, runs [Rent+](https://github.com/SajadMirzaei/RentPlus), and converts output to SARGE-format output files (requires RentPlus.jar file)
 
 ## Testing programs
 
