@@ -131,7 +131,7 @@ cladeset adjust_clade_recomb(arg_node* node,
                     recomb_limit = r->left;
                 }
                 
-                cladeset alphaprime = set_diff_bitset(r->alpha, r->leaving);
+                //cladeset alphaprime = set_diff_bitset(r->alpha, r->leaving);
                 cladeset betaprime = set_diff_bitset(r->beta, r->leaving);
                 if (r->up){
                     if (issuperset_bitset(clade, r->alpha) && !issuperset_bitset(clade, betaprime)){
@@ -189,7 +189,7 @@ cladeset adjust_clade_recomb(arg_node* node,
                 }
                 
                 cladeset alphaprime = set_diff_bitset(r->alpha, r->leaving);
-                cladeset betaprime = set_diff_bitset(r->beta, r->leaving);
+                //cladeset betaprime = set_diff_bitset(r->beta, r->leaving);
                 if (r->up){
                     if (issuperset_bitset(clade, alphaprime) && !issuperset_bitset(clade, r->beta)){
                         if (clade != alphaprime){
@@ -764,7 +764,7 @@ void clade_maxdists(map<arg_node*, float>& dists,
                 for (set<arg_node*>::iterator r = allnodes_r.begin(); r != allnodes_r.end(); ++r){
                     un |= (*r)->clade;
                 }
-                if (un.count() < num_haplotypes){
+                if (un.count() < (unsigned int) num_haplotypes){
                     new_l.insert(un);
                     new_r.insert(un);
                 }
@@ -1185,7 +1185,7 @@ higher value of MAXHAPS (>= %.0f) as follows:\n", ceil((float)(allnodes_l.size()
     }
     
     nodeset choice_mask;
-    for (int i = 0; i < lnodes_sorted.size() + rnodes_sorted.size(); ++i){
+    for (unsigned int i = 0; i <  lnodes_sorted.size() + rnodes_sorted.size(); ++i){
         choice_mask.set(i);
     }
     
@@ -1654,13 +1654,13 @@ higher value of MAXHAPS (>= %.0f) as follows:\n", ceil((float)(allnodes_l.size()
                 fprintf(stderr, "%ld %ld\n", nodesets[i].count(), nodesets[i].size());
             }
             
-            if (max_size == -1 || nodesets[i].count() > max_size){
+            if (max_size == -1 || (long int) nodesets[i].count() > max_size){
                 ns_maxsize.clear();
                 ns_maxsize.insert(i);
                 max_size = nodesets[i].count();
                 
             }
-            else if (nodesets[i].count() == (long unsigned int)max_size){
+            else if ((long int) nodesets[i].count() == max_size){
                 ns_maxsize.insert(i);
             }
         }
@@ -2780,13 +2780,13 @@ bool resolve_recomb(arg_node* node,
 
     candidate_other = NULL;
     
-    bool break_on_mistake = false;
+    //bool break_on_mistake = false;
     
     bool force_solve = false;
     
     short max_solve_attempts = 2;
     
-    bool last_attempt = false;
+    //bool last_attempt = false;
     
     if (hard_limit_l != -1 && hard_limit_r != -1){
         force_solve = true;
@@ -2794,7 +2794,7 @@ bool resolve_recomb(arg_node* node,
     else{
         if (node->solve_attempts == max_solve_attempts){
             return false;
-            last_attempt = true;
+            //last_attempt = true;
             force_solve = true;
         }
         else{
@@ -3984,8 +3984,8 @@ bool resolve_recomb(arg_node* node,
         
         recomb_catalog.push_back(r);
         
-        long int l_boundary = r.left + (long int)floor((float)(r.right-r.left)/2);
-        long int r_boundary = r.right - (long int)ceil((float)(r.right-r.left)/2);
+        //long int l_boundary = r.left + (long int)floor((float)(r.right-r.left)/2);
+        //long int r_boundary = r.right - (long int)ceil((float)(r.right-r.left)/2);
         
         if (r.left >= r.right){
             fprintf(stderr, "recomb left index is greater than right index\n");
@@ -4310,7 +4310,7 @@ bool resolve_recomb(arg_node* node,
         }
         //ltarget = l_boundary;
         
-        bool created_failures = false;
+        //bool created_failures = false;
         
         for (set<arg_node*>::iterator node_left = nodes_left.begin(); node_left != nodes_left.end();
             ++node_left){

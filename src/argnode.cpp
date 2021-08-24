@@ -1139,7 +1139,7 @@ void insert_below_parent(arg_node* child,
     }
     
     bool add_parents = true;
-    bool leftward = false;
+    //bool leftward = false;
     
     if (start != -1 && start < child->start){
         // We were expanding range but hit a failure that actually contracted the range.
@@ -1241,7 +1241,7 @@ bool safe_to_create_node(cladeset& clade,
     long int pos,
     long int prop_dist,
     int num_haplotypes){
-    if (clade.count() == num_haplotypes){
+    if (clade.count() == (unsigned int) num_haplotypes){
         return false;
     }
     if (clade.count() == 1){
@@ -1355,7 +1355,7 @@ arg_node* create_node(arg_node* node,
         exit(1);
     }
     
-    if (node->clade.count() == num_haplotypes){
+    if (node->clade.count() == (unsigned int) num_haplotypes){
         
         if (DEBUG_MODE){
             fprintf(stderr, "CREATING ROOT?\n");
@@ -1422,7 +1422,7 @@ arg_node* create_node(arg_node* node,
     
     bool merge_nodes = false;
     
-    arg_node* nodetomerge = NULL;
+    //arg_node* nodetomerge = NULL;
     
     set<arg_node*> nodestomerge;
     // First check to see if we can merge with a preexisting node.
@@ -1449,8 +1449,8 @@ arg_node* create_node(arg_node* node,
                 set<arg_node*> parents_tmp;
                 set<arg_node*> children_tmp;
                 
-                bool prevnode_left = false;
-                bool prevnode_right = false;
+                //bool prevnode_left = false;
+                //bool prevnode_right = false;
                 
                 if (pass){
 
@@ -1573,7 +1573,7 @@ arg_node* create_node(arg_node* node,
                 if (pass){
                     merge_nodes = true;
                     nodestomerge.insert(prevnode->second);
-                    nodetomerge = prevnode->second;
+                    //nodetomerge = prevnode->second;
                 }
             }
         }
@@ -1585,7 +1585,7 @@ arg_node* create_node(arg_node* node,
         set<arg_node*> mergenodes_right;
         set<arg_node*> mergenodes_span;
         
-        bool done = false;
+        //bool done = false;
         
         for (set<arg_node*>::iterator n = nodestomerge.begin(); n != nodestomerge.end(); ++n){
             
@@ -1640,7 +1640,7 @@ arg_node* create_node(arg_node* node,
                     print_node_lite(*n, num_haplotypes);
                     exit(1);
                 }
-                done = true;
+                //done = true;
                 return *n;
                 break;
             }
@@ -1751,10 +1751,10 @@ arg_node* create_node(arg_node* node,
                 }
             }
             
-            long int origstart1 = left_node->start;
-            long int origend1 = left_node->end;
-            long int origstart2 = right_node->start;
-            long int origend2 = right_node->end;
+            //long int origstart1 = left_node->start;
+            //long int origend1 = left_node->end;
+            //long int origstart2 = right_node->start;
+            //long int origend2 = right_node->end;
             
             cladeset cl = left_node->clade;
             long int leftsitekey = *left_node->sites.begin();
@@ -6144,7 +6144,7 @@ void print_node_recursive(arg_node* n, int indent_level, int num_haplotypes){
     }
     fprintf(stderr, "}\n");
     string members = indent_str + "(";
-    for (unsigned int i = 0; i < num_haplotypes; ++i){
+    for (unsigned int i = 0; i < (unsigned int) num_haplotypes; ++i){
         if (n->clade.test(num_haplotypes-i-1)){
             char buf[4];
             sprintf(buf, "%d", i);
@@ -6190,7 +6190,7 @@ void print_node_recursive_upward(arg_node* n, int indent_level, int num_haplotyp
     }
     fprintf(stderr, "}\n");
     string members = indent_str + "(";
-    for (unsigned int i = 0; i < num_haplotypes; ++i){
+    for (unsigned int i = 0; i < (unsigned int) num_haplotypes; ++i){
         if (n->clade.test(num_haplotypes-i-1)){
             char buf[4];
             sprintf(buf, "%d", i);
@@ -6239,7 +6239,7 @@ void print_node_recursive_pos(arg_node* n, long int pos, int indent_level, int n
     }
     fprintf(stderr, "}\n");
     string members = indent_str + "(";
-    for (unsigned int i = 0; i < num_haplotypes; ++i){
+    for (unsigned int i = 0; i < (unsigned int) num_haplotypes; ++i){
         if (n->clade.test(num_haplotypes-i-1)){
             char buf[4];
             sprintf(buf, "%d", i);
@@ -6287,7 +6287,7 @@ void print_node_recursive_upward_pos(arg_node* n, long int pos, int indent_level
     }
     fprintf(stderr, "}\n");
     string members = indent_str + "(";
-    for (unsigned int i = 0; i < num_haplotypes; ++i){
+    for (unsigned int i = 0; i < (unsigned int) num_haplotypes; ++i){
         if (n->clade.test(num_haplotypes-i-1)){
             char buf[4];
             sprintf(buf, "%d", i);
@@ -6335,7 +6335,7 @@ void print_node_upward_onelevel(arg_node* n, int indent_level, int num_haplotype
     }
     fprintf(stderr, "}\n");
     string members = indent_str + "(";
-    for (unsigned int i = 0; i < num_haplotypes; ++i){
+    for (unsigned int i = 0; i < (unsigned int) num_haplotypes; ++i){
         if (n->clade.test(num_haplotypes-i-1)){
             char buf[4];
             sprintf(buf, "%d", i);
@@ -6385,7 +6385,7 @@ void print_node_downward_onelevel(arg_node* n, int indent_level, int num_haploty
     }
     fprintf(stderr, "}\n");
     string members = indent_str + "(";
-    for (unsigned int i = 0; i < num_haplotypes; ++i){
+    for (unsigned int i = 0; i < (unsigned int) num_haplotypes; ++i){
         if (n->clade.test(num_haplotypes-i-1)){
             char buf[4];
             sprintf(buf, "%d", i);
@@ -6424,7 +6424,7 @@ void print_node_lite(arg_node* n, int num_haplotypes){
     }
     fprintf(stderr, "]\n");
     // Don't print all mutations for the root node
-    if (n->clade.count() != num_haplotypes){
+    if (n->clade.count() != (unsigned int) num_haplotypes){
         fprintf(stderr, "{ ");
         for (set<long int>::iterator mut = n->mutations.begin(); mut != n->mutations.end(); ++mut){
             fprintf(stderr, "%ld ", *mut);
@@ -6432,7 +6432,7 @@ void print_node_lite(arg_node* n, int num_haplotypes){
         fprintf(stderr, "}\n");
     }
     string members = "(";
-    for (unsigned int i = 0; i < num_haplotypes; ++i){
+    for (unsigned int i = 0; i < (unsigned int) num_haplotypes; ++i){
         if (n->clade.test(num_haplotypes-i-1)){
             char buf[4];
             sprintf(buf, "%d", i);
