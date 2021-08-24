@@ -67,7 +67,7 @@ bool operator<(const arg_node& n1, const arg_node& n2){
     }
 }
 
-bool sort_nodes_size(arg_node*& n1, arg_node*& n2){
+bool sort_nodes_size(const arg_node* n1, const arg_node* n2){
     if (n1->clade.count() == n2->clade.count()){
         return n1 < n2;
     }
@@ -2561,8 +2561,7 @@ bool sp_aux(arg_node* child,
             child->parents.insert(*edge_new);
         }
     }
-    
-    vector<arg_node*> nodes_discarded;
+    vector<arg_node*> nodes_discarded;    
     for (map<arg_node*, vector<vert_edge> >::iterator d = edges_discarded.begin();
         d != edges_discarded.end(); ++d){
         nodes_discarded.push_back(d->first);

@@ -12,6 +12,7 @@
 #include <fstream>
 #include <regex>
 #include <cmath>
+#include <cstring>
 #include <bitset>
 #include <zlib.h>
 #include <unordered_set>

@@ -376,7 +376,7 @@ struct arg_node{
 
 bool operator<(const arg_node&, const arg_node&);
    
-bool sort_nodes_size(arg_node*&, arg_node*&);
+bool sort_nodes_size(const arg_node*, const arg_node*);
 
 struct nodeptr_parent_sort{
     bool operator() (const arg_node* n1, const arg_node* n2) const {
