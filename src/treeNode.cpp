@@ -12,7 +12,6 @@
 #include <fstream>
 #include <regex>
 #include <cmath>
-#include <cstring>
 #include <bitset>
 #include <zlib.h>
 #include <unordered_set>
@@ -108,6 +107,42 @@ void treeNode::set_dist_above(float dist_down){
     for (vector<treeNode*>::iterator child = this->children.begin();
         child != this->children.end(); ++child){
         (*child)->set_dist_above(dist_down);
+    }
+}
+
+void treeNode::add_dist(float dist){
+    
+    float denom = (float)this->children.size();
+    if (denom == 0){
+        denom = 1.0;
+    }
+    dist = dist * (1.0/denom);
+    
+    this->dist += dist;
+    this->dist_above += dist;
+    this->dist_norm = this->dist / (this->dist_above + this->dist_below);
+    
+    // This should be a leaf node (or as close to one as exists), so don't propagate down.
+    
+    // Propagate this change up to the top.
+    if (this->parent != NULL){
+        treeNode* parent = this->parent;
+        bool stop = false;
+        while (!stop){
+            dist = dist * (1.0 / (float)parent->children.size());
+            parent->dist_below += dist;
+            float denom2 = parent->dist_above + parent->dist_below;
+            if (denom2 == 0){
+                denom2 = 1.0;
+            }
+            parent->dist_norm = parent->dist / denom;
+            if (parent->parent == NULL){
+                stop = true;
+            }
+            else{
+                parent = parent->parent;
+            }
+        }
     }
 }
 
@@ -1056,6 +1091,141 @@ int treeNode::clades_correct(treeNode* correct){
         correct_sum += (*child)->clades_correct(correct);
     }
     return correct_sum;
+}
+
+void treeNode::get_wrong_clades(treeNode* correct, unordered_set<cladeset>& wrong_clades){
+    if (this->parent != NULL && (this->subtree_leaves()).count() > 1){
+        // See if this clade exists in the other tree.
+        cladeset subtree = this->subtree_leaves();
+        if (correct->get_clade_match(subtree) != NULL){
+            // correct
+        }
+        else{
+            wrong_clades.insert(subtree);
+        }
+        
+        
+    }
+    for (vector<treeNode*>::iterator child = this->children.begin();
+        child != this->children.end(); ++child){
+        (*child)->get_wrong_clades(correct, wrong_clades);
+    }
+}
+
+void treeNode::get_matching_clades(treeNode* correct, vector<pair<treeNode*, treeNode*> >& cladepairs){
+    if (this->parent != NULL && (this->subtree_leaves()).count() > 1){
+        // See if this clade exists in the other tree.
+        cladeset subtree = this->subtree_leaves();
+        treeNode* match = correct->get_clade_match(subtree);
+        if (match != NULL){
+            cladepairs.push_back(make_pair(match, this));
+        }
+    }
+    for (vector<treeNode*>::iterator child = this->children.begin();
+        child != this->children.end(); ++child){
+        (*child)->get_matching_clades(correct, cladepairs);
+    }
+}
+
+void treeNode::print_missing_sizes(treeNode* correct){
+    if (this->parent != NULL && (this->subtree_leaves()).count() > 1){
+        
+        // See if this clade exists in the other tree.
+        cladeset subtree = this->subtree_leaves();
+        
+        treeNode* match = correct->get_clade_match(subtree);
+        bool inv = correct->has_clade_invalidates(subtree);
+        if (match == NULL && !inv){
+            fprintf(stdout, "%ld\tmissing\n", subtree.count());
+        }
+        else if (match == NULL && inv){
+            fprintf(stdout, "%ld\tincorrect\n", subtree.count());
+        }
+        else{
+            fprintf(stdout, "%ld\tfound\n", subtree.count());
+        }
+    }
+    for (vector<treeNode*>::iterator child = this->children.begin();
+        child != this->children.end(); ++child){
+        (*child)->print_missing_sizes(correct);
+    }
+}
+/**
+ * Given a "correct" tree (and assuming this is the "test" tree), compute
+ * how many of this node's subtree's clades exist in the "correct" tree (and
+ * how many don't). Return the total number of nodes in this tree's subtree
+ * that are "correct," excluding singletons and roots of both trees.
+ */
+void treeNode::wrong_clade_properties_aux(treeNode* correct, 
+    float& count_corr,
+    float& count_incorr,
+    float& incorr_size_sum,
+    float& incorr_depth_sum,
+    float& corr_size_sum,
+    float& corr_depth_sum,
+    float depth){
+    
+    if (this->parent != NULL && (this->subtree_leaves()).count() > 1){
+        // See if this clade exists in the other tree.
+        cladeset subtree = this->subtree_leaves();
+        if (correct->get_clade_match(subtree) != NULL){
+            // Correct
+            count_corr++;
+            corr_size_sum += (float)subtree.count();
+            corr_depth_sum += depth;
+        }
+        else{
+            count_incorr++;
+            incorr_size_sum += (float)subtree.count();
+            incorr_depth_sum += depth;
+        }
+    }
+    for (vector<treeNode*>::iterator child = this->children.begin();
+        child != this->children.end(); ++child){
+        (*child)->wrong_clade_properties_aux(correct,
+            count_corr,
+            count_incorr,
+            incorr_size_sum,
+            incorr_depth_sum,
+            corr_size_sum,
+            corr_depth_sum,
+            depth+1);
+    }
+}
+
+void treeNode::wrong_clade_properties(treeNode* correct, 
+    float& mean_incorr_size,
+    float& mean_incorr_depth,
+    float& mean_corr_size,
+    float& mean_corr_depth){
+    
+    mean_incorr_size = 0;
+    mean_incorr_depth = 0;
+    mean_corr_size = 0;
+    mean_corr_depth = 0;
+    
+    float count_corr = 0;
+    float count_incorr = 0;
+    float incorr_size_sum = 0;
+    float incorr_depth_sum = 0;
+    float corr_size_sum = 0;
+    float corr_depth_sum = 0;
+    
+    this->wrong_clade_properties_aux(correct, count_corr, count_incorr,
+        incorr_size_sum, incorr_depth_sum, corr_size_sum, corr_depth_sum, 0.0);
+    
+    if (count_corr == 0){
+        count_corr = 1.0;
+    }
+    if (count_incorr == 0){
+        count_incorr = 1.0;
+    }
+    
+    mean_incorr_size = incorr_size_sum / count_incorr;
+    mean_incorr_depth = incorr_depth_sum / count_incorr;
+    mean_corr_size = corr_size_sum / count_corr;
+    mean_corr_depth = corr_depth_sum / count_corr;
+    
 }
 
 /**

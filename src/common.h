@@ -115,7 +115,7 @@ void parse_pops(std::map<std::string, std::string>&, std::map<std::string, std::
 
 // Parse a file mapping haplotype names to branch shortening vals
 void parse_brshorten(std::unordered_map<cladeset, float>&, std::vector<std::string>&, std::string&, int);
-
+void parse_brshorten_range(std::unordered_map<cladeset, std::pair<float, float> >&, std::vector<std::string>&, std::string&, int, int);
 void unnorm_branchlens(treeNode*);
 void norm_brlens(treeNode*, float);
 
@@ -149,6 +149,7 @@ std::string replace_scinot_newick(std::string);
 
 // Tree evaluation functions
 int parse_ms_file(std::map<std::pair<long int, long int>, treeNode>&, std::string);
+bool ms_next_tree(std::ifstream& infile, treeNode& tree, long int& start, long int& end);
 void print_ms_tree_site(std::map<std::pair<long int, long int>, treeNode>&, long int pos);
 treeNode* get_ms_tree_site(std::map<std::pair<long int, long int>, treeNode>&, long int);
 

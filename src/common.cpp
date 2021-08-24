@@ -485,7 +485,7 @@ void parse_pops(map<string, string>& indv2pop, map<string, vector<string> >& pop
                 }
                 field_index++;
             }
-            if (ploidy == 0){
+            if (ploidy <= 1){
                 indv2pop.insert(make_pair(indvname, popname));
                 if (pop2indv.count(popname) == 0){
                     vector<string> indvs;
@@ -560,6 +560,68 @@ void parse_brshorten(unordered_map<cladeset, float>& brshorten_vals,
     }
 }
 
+/**
+ * Parses a file mapping haplotype names to branch shortening values (allowing for min and
+ * max to be given)
+ */
+void parse_brshorten_range(unordered_map<cladeset, pair<float, float> >& brshorten_vals,
+    vector<string>& indvs, 
+    string& filename, 
+    int num_haplotypes,
+    int ploidy){
+    
+    fstream fin;
+    fin.open(filename.c_str(), fstream::in);
+    if (!fin.good()){
+        fprintf(stderr, "ERROR opening file %s\n", filename.c_str());
+        exit(1);
+    }
+    string line;
+    while (!fin.eof()){
+        std::getline(fin, line);
+        if (line.compare("") != 0){
+            istringstream tabsplitter(line);
+            string field;
+            int field_index = 0;
+            
+            string indvname;
+            vector<string> hapnames;
+            float brshorten1 = -1;
+            float brshorten2 = -1;
+            
+            while(std::getline(tabsplitter, field, '\t')){
+                if (field_index == 0){
+                    indvname = field;
+                    for (int i = 1; i <= ploidy; ++i){
+                        char buf[100];
+                        sprintf(buf, "%s-%d", indvname.c_str(), i);
+                        hapnames.push_back(string(buf));
+                    }
+                }
+                else if (field_index == 1){
+                    brshorten1 = atof(field.c_str());
+                }
+                else if (field_index == 2){
+                    brshorten2 = atof(field.c_str());
+                }
+                field_index++;
+            }
+            // Translate haplotype name into a cladeset
+            int hap_ind = -1;
+            for (int i = 0; i < indvs.size(); ++i){
+                for (int j = 0; j < hapnames.size(); ++j){
+                    if (indvs[i] == hapnames[j]){
+                        // i is the haplotype index.
+                        set<unsigned int> bs;
+                        bs.insert(i);
+                        cladeset cs = set2bitset(bs, num_haplotypes);
+                        brshorten_vals.insert(make_pair(cs, make_pair(brshorten1, brshorten2)));
+                    }
+                }
+            }
+        }
+    }
+}
 void unnorm_branchlens(treeNode* node){
     node->dist_norm = node->dist;
     for (vector<treeNode*>::iterator c = node->children.begin(); c != node->children.end(); ++c){
@@ -992,6 +1054,133 @@ int parse_ms_file(map<pair<long int, long int>, treeNode>& trees, string filenam
    }
    return num_haplotypes;
 }
+
+/**
+ * Given an open file handle for an MS file, parses and returns the next tree (and tells
+ * what sites it covers.)
+ */
+bool ms_next_tree(std::ifstream& infile, treeNode& tree, long int& start, long int& end){
+    
+    // NOTE: This seems counterintuitive, but when escaping square brackets ([]) and
+    // braces ({}), you have to escape the first one, but should not escape the second
+    // or it will cause an error (reference: https://stackoverflow.com/questions/36596563/regex-match-for-square-brackets)
+    //regex treematch(R"(\[([0-9]+)]([\(\),\.:a-zA-Z0-9\-_;]+))", regex::extended);
+    //regex treematch("(^\[([0-9]+)]([.]+)$)", regex::extended);
+    regex treematch(R"(^\[([0-9]+)](.+)$)", regex::extended);
+
+    static int num_haplotypes = -1;
+    
+    if (num_haplotypes != -1){
+        // Already initialized. New start is old end + 1
+        start = end+1;
+    }
+    else{
+        // Initialize other first-time stuff.
+        start = 1;
+        end = -1;
+    }
+    
+    bool reading_trees = false;
+    
+    for (string line; getline(infile, line);){
+        // Need to get the number of haplotypes -- this can be found in 
+        // the first line, which is a copy of the command used to run MS
+        if (num_haplotypes == -1){
+            istringstream space_splitter(line);
+            string field;
+            int field_index = 0;
+            while(std::getline(space_splitter, field, ' ')){
+                if (field_index == 0){
+                    // This is the path to MS.
+                }
+                else if (field_index == 1){
+                    num_haplotypes = atoi(field.c_str());
+                    break;
+                }
+                field_index++;
+            }
+            if (num_haplotypes == -1){
+                fprintf(stderr, "ERROR: unable to read the number of haplotypes from the MS output.\n");
+                return false;
+            }
+        }
+        else{
+            // Check that this is a tree line and extract useful information
+            cmatch match;
+        
+            try{
+
+                if (regex_match(line.c_str(), match, treematch)){
+                    reading_trees = true;
+                
+                    string len = extract_regex_match(line.c_str(), match[0], match[1]);
+                    string newick = extract_regex_match(line.c_str(), match[0], match[2]);
+                    
+                    long int len_num = strtol(len.c_str(), 0, 10);
+                
+                    end = start + len_num-1;
+                
+                    string newick_decremented = decrement_haps_newick(newick);
+                    string newick_finished = replace_scinot_newick(newick_decremented);
+                    
+                    parse_newick(tree, newick_finished, num_haplotypes);
+                    norm_brlens(&tree);
+                    tree.setRoot();
+                    return true;
+                }
+                else if (reading_trees){
+                
+                    // We've read past the tree part of the file.
+                    return false;
+                }
+            }
+            catch (regex_error& e){
+                if (e.code() == regex_constants::error_collate){
+                    fprintf(stderr, "regex error_collate\n");
+                }
+                else if (e.code() == regex_constants::error_ctype){
+                    fprintf(stderr, "regex error_ctype\n");
+                }
+                else if (e.code() == regex_constants::error_escape){
+                    fprintf(stderr, "regex error_escape\n");
+                }
+                else if (e.code() == regex_constants::error_backref){
+                    fprintf(stderr, "regex error_backref\n");
+                }
+                else if (e.code() == regex_constants::error_brack){
+                    fprintf(stderr, "regex error_bracket\n");
+                }
+                else if (e.code() == regex_constants::error_paren){
+                    fprintf(stderr, "regex error_paren\n");
+                }
+                else if (e.code() == regex_constants::error_brace){
+                    fprintf(stderr, "regex error_brace\n");
+                }
+                else if (e.code() == regex_constants::error_badbrace){
+                    fprintf(stderr, "regex error_badbrace\n");
+                }
+                else if (e.code() == regex_constants::error_range){
+                    fprintf(stderr, "regex error_range\n");
+                }
+                else if (e.code() == regex_constants::error_space){
+                    fprintf(stderr, "regex error_space\n");
+                }
+                else if (e.code() == regex_constants::error_badrepeat){
+                    fprintf(stderr, "regex error_badrepeat\n");
+                }
+                else if (e.code() == regex_constants::error_complexity){
+                    fprintf(stderr, "regex error_complexity\n");
+                }
+                else if (e.code() == regex_constants::error_stack){
+                    fprintf(stderr, "regex error_stack\n");
+                }
+                return false;
+            }
+        }
+   }
+   return false;
+}
+
 
 void print_ms_tree_site(map<pair<long int, long int>, treeNode>& ms_trees, long int pos){
     for (map<pair<long int, long int>, treeNode>::iterator ms_it = ms_trees.begin();

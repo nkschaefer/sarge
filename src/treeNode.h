@@ -93,6 +93,7 @@ class treeNode{
         void free_recursive();
         void delete_children();
         void set_dist_above(float);
+        void add_dist(float);
         void setRoot();
         
         
@@ -146,6 +147,11 @@ class treeNode{
         int clades_correct(treeNode* correct);
         int clades_tot();
         
+        void get_wrong_clades(treeNode*, std::unordered_set<cladeset>&);
+        void get_matching_clades(treeNode*, std::vector<std::pair<treeNode*, treeNode*> >&);
+        void print_missing_sizes(treeNode*);
+        void wrong_clade_properties_aux(treeNode*, float&, float&, float&, float&, float&, float&, float);
+        void wrong_clade_properties(treeNode*, float&, float&, float&, float&);
         std::pair<float, float> mean_children();
         
         void mask_haps(cladeset&);
