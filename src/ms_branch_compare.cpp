@@ -35,10 +35,9 @@ void help(int code){
    fprintf(stderr, "For clades in a file that also exist in the true MS trees, compare branch lengths.\n");
     fprintf(stderr, "[OPTIONS]:\n");
     fprintf(stderr, "   --ms -m The MS output file (REQUIRED)\n");
-    fprintf(stderr, "   --unnorm -N do not normalize branch lengths for file being compared to MS\n");
-    fprintf(stderr, "   --scale1 -1 Divide branch lengths in test data by this number\n");
-    fprintf(stderr, "   --scale2 -2 Divide branch lengths in MS data by this number\n");
-exit(code);
+    fprintf(stderr, "   --unnorm -N do not normalize branch lengths for file being compared to MS (specify this if output is from another program such as tsinfer or Relate, but converted to SARGE format)\n");
+    fprintf(stderr, "NOTE: branch lengths from MS (first column) are reported in coalescent units. Branch lengths from the inferred ARG are reported in units of a different scale. SARGE: percent of local human/chimpanzee divergence, Relate and tsinfer: generations.\n");
+    exit(code);
 }
 
 int main(int argc, char *argv[]) {    
@@ -52,8 +51,6 @@ int main(int argc, char *argv[]) {
     static struct option long_options[] = {
        {"ms", required_argument, 0, 'm'},
        {"unnorm", no_argument, 0, 'N'},
-       {"scale1", required_argument, 0, '1'},
-       {"scale2", required_argument, 0, '2'},
        {"help", optional_argument, 0, 'h'},
        {0, 0, 0, 0} 
     };
@@ -62,26 +59,18 @@ int main(int argc, char *argv[]) {
         help(0);
     }
     
-    float scale1 = 1.0;
-    float scale2 = 1.0;
     bool unnorm = false;
     
     int option_index = 0;
     int ch;
     
-    while((ch = getopt_long(argc, argv, "m:1:2:Nh", long_options, &option_index )) != -1){
+    while((ch = getopt_long(argc, argv, "m:Nh", long_options, &option_index )) != -1){
         switch(ch){
             case 0:
                 // This option set a flag. No need to do anything here.
                 break;
             case 'm':
                 msfilename = optarg;
-                break;
-            case '1':
-                scale1 = atof(optarg);
-                break;
-            case '2':
-                scale2 = atof(optarg);
                 break;
             case 'N':
                 unnorm = true;
@@ -174,9 +163,6 @@ int main(int argc, char *argv[]) {
                 if (unnorm){
                     d2 = cp->second->dist;
                 }
-                // Scale by correct numbers
-                d1 = d1 * scale1;
-                d2 = d2 * scale2;
                 fprintf(stdout, "%f %f\n", d1, d2);
             }
             

@@ -21,7 +21,7 @@ OPTS += -stdlib=libc++
 endif
 CCOMP = gcc
 
-all: bin/sarge bin/trees2newick bin/index bin/index_geno bin/ms_tree_site bin/admix_scan bin/tmrcas_scan bin/dstat bin/upgma bin/vcf2sarge bin/vcf_depths bin/cpg_bed bin/ms2sarge bin/haplens bin/dump_haplens bin/bait_scan bin/rth bin/rel_ils test/tsinfer2trees test/ms_branch_compare test/ms_corr_dist test/ms_missing_clades test/score_trees_ms
+all: bin/sarge bin/trees2newick bin/index bin/index_geno bin/ms_tree_site bin/admix_scan bin/tmrcas_scan bin/dstat bin/upgma bin/vcf2sarge bin/vcf_depths bin/cpg_bed bin/ms2sarge bin/haplens bin/dump_haplens bin/bait_scan bin/rth bin/rel_ils test/treedat2sarge test/newick2sarge test/ms_branch_compare test/ms_corr_dist test/ms_missing_clades test/score_trees_ms
 
 bin/sarge: src/main.cpp $(OBJDEPS)
 	$(COMP) -std=c++11 $(OPTS) -g src/main.cpp -o bin/sarge $(OBJDEPS) -lz 
@@ -77,8 +77,11 @@ bin/haplens: src/haplens.cpp src/common.cpp src/treeNode.cpp src/serialize.cpp $
 bin/dump_haplens: src/dump_haplens.cpp src/common.cpp src/treeNode.cpp  $(OBJDEPS)
 	$(COMP) -std=c++11 $(OPTS) src/dump_haplens.cpp -o bin/dump_haplens $(OBJDEPS) -lz
 
-test/tsinfer2trees: src/tsinfer2trees.cpp $(OBJDEPS)
-	$(COMP) -std=c++11 $(OPTS) src/tsinfer2trees.cpp -o test/tsinfer2trees $(OBJDEPS) -lz
+test/treedat2sarge: src/treedat2sarge.cpp $(OBJDEPS)
+	$(COMP) -std=c++11 $(OPTS) src/treedat2sarge.cpp -o test/treedat2sarge $(OBJDEPS) -lz
+
+test/newick2sarge: src/newick2sarge.cpp $(OBJDEPS)
+	$(COMP) -std=c++11 $(OPTS) src/newick2sarge.cpp -o test/newick2sarge $(OBJDEPS) -lz
 
 test/score_trees_ms: src/score_trees_ms.cpp $(OBJDEPS)
 	$(COMP) -std=c++11 $(OPTS) src/score_trees_ms.cpp -o test/score_trees_ms $(OBJDEPS) -lz

@@ -6,99 +6,49 @@
 #include <iostream>
 #include <sstream>
 #include <fstream>
-#include "../src/sets.h"
-#include "../src/treeNode.h"
+#include "sets.h"
+#include "treeNode.h"
 #include <math.h>
 #include <zlib.h>
-#include "../src/serialize.h"
-#include "../src/common.h"
+#include "serialize.h"
+#include "common.h"
 
 using std::cout;
 using std::endl;
 using namespace std;
 
-
-
 /**
  * Print a help message to the terminal and exit.
  */
 void help(int code){
-   fprintf(stderr, "tsinfer2trees [OPTIONS]\n");
-   fprintf(stderr, "Given (custom format) serial information about tsinfer trees, \
-converts to SARGE-format output.\n");
+   fprintf(stderr, "newick2sarge [OPTIONS]\n");
+   fprintf(stderr, "Given tab-separated newick format data (chrom\tpos\tnewick) - i.e. from utilities/sarge_rentplus.py, \
+outputs in SARGE format to the given file.\n");
     fprintf(stderr, "[OPTIONS]:\n");
     fprintf(stderr, "   --input the input .geno.gz file for computing number of haplotypes\n");
     fprintf(stderr, "   --outfile -o The file to create in SARGE format.\n");
+    fprintf(stderr, "   --no_branchlengths -b Specify if there are no branch lengths \
+in the trees\n");
+    fprintf(stderr, "   --decrement -d Specify to reduce each haplotype index by 1\n");
 exit(code);
 }
 
-void handle_tree(gzFile& out_gz, string& treedat, int num_haplotypes){
-
-    if (treedat[treedat.length()-1] == '|'){
-        treedat = treedat.substr(0, treedat.length()-1);
-    }
-    
-    istringstream splitter(treedat);
-    string field;
-    short fld_index = 0;
-    
-    bool clade_fld = true;
-    bool br_fld = false;
-    
-    cladeset clade;
-    
-    while(getline(splitter, field, '|')){
-    
-        if (clade_fld){
-            clade.reset();
-            
-            istringstream commasplit(field);
-            string hap;
-            while(getline(commasplit, hap, ',')){
-                int hapind = atoi(hap.c_str());
-                clade.set(num_haplotypes-1-hapind);
-            }
-            // Write out fake stuff
-            serialize_str(out_gz, "");
-    
-            serialize_longint(out_gz, -1);
-            
-            clade_fld = false;
-            br_fld = true;
-        }
-        else if (br_fld){
-            float brlen = atof(field.c_str());
-            
-            serialize_float(out_gz, brlen);
-            
-            serialize_float(out_gz, 0);
-    
-            serialize_float(out_gz, 0);
-    
-            serialize_longint(out_gz, 0);
-            
-            serialize_bitset(out_gz, clade, num_haplotypes);
-            br_fld = false;
-        }
-        else{
-            int num_children = atoi(field.c_str());
-            serialize_int(out_gz, num_children);
-            clade_fld = true;
-        }
-    
-    }
-}
 
 int main(int argc, char *argv[]) {
     static struct option long_options[] = {
        {"input", required_argument, 0, 'i'},
        {"outfile", required_argument, 0, 'o'},
+       {"no_branchlengths", no_argument, 0, 'b'},
+       {"decrement", no_argument, 0, 'd'},
        {"help", optional_argument, 0, 'h'},
        {0, 0, 0, 0} 
     };
     
     string infile;
     string outfile;
+    
+    bool no_brlen = false;
+    bool decrement = false;
     
     int bufsize = 1048576;
  
@@ -108,7 +58,7 @@ int main(int argc, char *argv[]) {
     if (argc == 1){
         help(0);
     }
-    while((ch = getopt_long(argc, argv, "i:o:h", long_options, &option_index )) != -1){
+    while((ch = getopt_long(argc, argv, "i:o:bdh", long_options, &option_index )) != -1){
         switch(ch){
             case 0:
                 // This option set a flag. No need to do anything here.
@@ -118,6 +68,12 @@ int main(int argc, char *argv[]) {
                 break;
             case 'o':
                 outfile = optarg;
+                break;
+            case 'b':
+                no_brlen = true;
+                break;
+            case 'd':
+                decrement = true;
                 break;
             case '?':
                 //help(0);
@@ -178,6 +134,17 @@ int main(int argc, char *argv[]) {
             fld_index++;
         }
         
+        
+        treeNode tree;
+        if (no_brlen){
+            treedat = add_brlens(treedat);
+        }
+        if (decrement){
+            treedat = decrement_haps_newick(treedat);
+        }
+
+        parse_newick(tree, treedat, num_haplotypes);
+        
         // Only print data about the chromosome if we haven't already seen it.
         // This will save a ton of space.
         static string prevchrom = "";
@@ -196,7 +163,7 @@ int main(int argc, char *argv[]) {
         serialize_longint(out_gz, pos);
         
         // Parse and serialize tree
-        handle_tree(out_gz, treedat, num_haplotypes);
+        tree.serialize(out_gz);
     }
     
     gzclose(out_gz);
