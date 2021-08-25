@@ -113,7 +113,7 @@ Some utility programs are provided for help with specific tasks.
 
 *<code>utilities/view_trees.py</code> can be used to look at individual trees (must select all trees (<code>zcat [output file]</code>) or a specific region (<code>bin/sarge_index [output file] chr3:5000000-10000000</code>) and pipe to <code>bin/trees2newick</code> and then to <code>utilities/view_trees.py</code>
 
-*<code>utilities/ms2sarge_input.py<code> will convert MS-format output -- i.e. produced using [ms](http://home.uchicago.edu/~rhudson1/source/mksamples.html) (with <code>-T</code> option), [scrm](https://github.com/scrm/scrm) (with <code>-T</code> option), or [msprime](https://readthedocs.org/projects/msprime/)'s <code>mspms</code> program (with <code>-T</code> option) to SARGE-format input files. You can then run SARGE or one of the following programs to convert/run another program on it and convert output to SARGE format.
+*<code>utilities/ms2sarge_input.py</code> will convert MS-format output -- i.e. produced using [ms](http://home.uchicago.edu/~rhudson1/source/mksamples.html) (with <code>-T</code> option), [scrm](https://github.com/scrm/scrm) (with <code>-T</code> option), or [msprime](https://readthedocs.org/projects/msprime/)'s <code>mspms</code> program (with <code>-T</code> option) to SARGE-format input files. You can then run SARGE or one of the following programs to convert/run another program on it and convert output to SARGE format.
  
 *<code>utilities/run_relate.sh</code> takes SARGE-format input files, converts to [Relate](https://myersgroup.github.io/relate/) format, runs Relate, and converts output to SARGE-format output files (requires Relate binaries, last tested with Relate v1.0.17)
 
